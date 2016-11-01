@@ -2567,8 +2567,9 @@ static void tcp_collapse_retrans(struct sock *sk, struct sk_buff *skb)
 
 	tcp_highest_sack_replace(sk, next_skb, skb);
 
-	skb_copy_from_linear_data(next_skb, skb_put(skb, next_skb_size),
-				  next_skb_size);
+	if (next_skb_size)
+		skb_copy_bits(next_skb, 0, skb_put(skb, next_skb_size),
+			      next_skb_size);
 
 	if (next_skb->ip_summed == CHECKSUM_PARTIAL)
 		skb->ip_summed = CHECKSUM_PARTIAL;
@@ -2604,9 +2605,6 @@ static void tcp_collapse_retrans(struct sock *sk, struct sk_buff *skb)
 static bool tcp_can_collapse(const struct sock *sk, const struct sk_buff *skb)
 {
 	if (tcp_skb_pcount(skb) > 1)
-		return false;
-	/* TODO: SACK collapsing could be used to remove this condition */
-	if (skb_shinfo(skb)->nr_frags != 0)
 		return false;
 	if (skb_cloned(skb))
 		return false;
