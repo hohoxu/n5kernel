@@ -168,7 +168,7 @@ void trace_benchmark_reg(void)
 {
 	bm_event_thread = kthread_run(benchmark_event_kthread,
 				      NULL, "event_benchmark");
-	WARN_ON(!bm_event_thread);
+	WARN_ON(IS_ERR(bm_event_thread));
 }
 
 /*
