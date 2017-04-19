@@ -265,25 +265,24 @@ static void __cls_bpf_delete_prog(struct rcu_head *rcu)
 	cls_bpf_delete_prog(prog->tp, prog);
 }
 
-static int cls_bpf_delete(struct tcf_proto *tp, unsigned long arg)
+static int cls_bpf_delete(struct tcf_proto *tp, unsigned long arg, bool *last)
 {
 	struct cls_bpf_prog *prog = (struct cls_bpf_prog *) arg;
+	struct cls_bpf_head *head = rtnl_dereference(tp->root);
 
 	cls_bpf_stop_offload(tp, prog);
 	list_del_rcu(&prog->link);
 	tcf_unbind_filter(tp, &prog->res);
 	call_rcu(&prog->rcu, __cls_bpf_delete_prog);
+	*last = list_empty(&head->plist);
 
 	return 0;
 }
 
-static bool cls_bpf_destroy(struct tcf_proto *tp, bool force)
+static void cls_bpf_destroy(struct tcf_proto *tp)
 {
 	struct cls_bpf_head *head = rtnl_dereference(tp->root);
 	struct cls_bpf_prog *prog, *tmp;
-
-	if (!force && !list_empty(&head->plist))
-		return false;
 
 	list_for_each_entry_safe(prog, tmp, &head->plist, link) {
 		cls_bpf_stop_offload(tp, prog);
@@ -293,7 +292,6 @@ static bool cls_bpf_destroy(struct tcf_proto *tp, bool force)
 	}
 
 	kfree_rcu(head, rcu);
-	return true;
 }
 
 static unsigned long cls_bpf_get(struct tcf_proto *tp, u32 handle)

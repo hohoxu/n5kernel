@@ -295,13 +295,10 @@ static void fl_destroy_rcu(struct rcu_head *rcu)
 	schedule_work(&head->work);
 }
 
-static bool fl_destroy(struct tcf_proto *tp, bool force)
+static void fl_destroy(struct tcf_proto *tp)
 {
 	struct cls_fl_head *head = rtnl_dereference(tp->root);
 	struct cls_fl_filter *f, *next;
-
-	if (!force && !list_empty(&head->filters))
-		return false;
 
 	list_for_each_entry_safe(f, next, &head->filters, list) {
 		fl_hw_destroy_filter(tp, (unsigned long)f);
@@ -312,7 +309,6 @@ static bool fl_destroy(struct tcf_proto *tp, bool force)
 
 	__module_get(THIS_MODULE);
 	call_rcu(&head->rcu, fl_destroy_rcu);
-	return true;
 }
 
 static unsigned long fl_get(struct tcf_proto *tp, u32 handle)
@@ -761,7 +757,7 @@ errout:
 	return err;
 }
 
-static int fl_delete(struct tcf_proto *tp, unsigned long arg)
+static int fl_delete(struct tcf_proto *tp, unsigned long arg, bool *last)
 {
 	struct cls_fl_head *head = rtnl_dereference(tp->root);
 	struct cls_fl_filter *f = (struct cls_fl_filter *) arg;
@@ -773,6 +769,7 @@ static int fl_delete(struct tcf_proto *tp, unsigned long arg)
 	fl_hw_destroy_filter(tp, (unsigned long)f);
 	tcf_unbind_filter(tp, &f->res);
 	call_rcu(&f->rcu, fl_destroy_filter);
+	*last = list_empty(&head->filters);
 	return 0;
 }
 
