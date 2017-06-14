@@ -814,13 +814,13 @@ static int crng_fast_load(const char *cp, size_t len)
 		p[crng_init_cnt % CHACHA_KEY_SIZE] ^= *cp;
 		cp++; crng_init_cnt++; len--;
 	}
+	spin_unlock_irqrestore(&primary_crng.lock, flags);
 	if (crng_init_cnt >= CRNG_INIT_CNT_THRESH) {
 		invalidate_batched_entropy();
 		crng_init = 1;
 		wake_up_interruptible(&crng_init_wait);
 		pr_notice("random: fast init done\n");
 	}
-	spin_unlock_irqrestore(&primary_crng.lock, flags);
 	return 1;
 }
 
@@ -885,6 +885,7 @@ static void crng_reseed(struct crng_state *crng, struct entropy_store *r)
 	}
 	memzero_explicit(&buf, sizeof(buf));
 	crng->init_time = jiffies;
+	spin_unlock_irqrestore(&crng->lock, flags);
 	if (crng == &primary_crng && crng_init < 2) {
 		invalidate_batched_entropy();
 		numa_crng_init();
@@ -905,7 +906,6 @@ static void crng_reseed(struct crng_state *crng, struct entropy_store *r)
 			urandom_warning.missed = 0;
 		}
 	}
-	spin_unlock_irqrestore(&crng->lock, flags);
 }
 
 static inline void crng_wait_ready(void)
@@ -2102,8 +2102,8 @@ static DEFINE_PER_CPU(struct batched_entropy, batched_entropy_u64);
 u64 get_random_u64(void)
 {
 	u64 ret;
-	bool use_lock = crng_init < 2;
-	unsigned long flags;
+	bool use_lock = READ_ONCE(crng_init) < 2;
+	unsigned long flags = 0;
 	struct batched_entropy *batch;
 
 #if BITS_PER_LONG == 64
@@ -2134,8 +2134,8 @@ static DEFINE_PER_CPU(struct batched_entropy, batched_entropy_u32);
 u32 get_random_u32(void)
 {
 	u32 ret;
-	bool use_lock = crng_init < 2;
-	unsigned long flags;
+	bool use_lock = READ_ONCE(crng_init) < 2;
+	unsigned long flags = 0;
 	struct batched_entropy *batch;
 
 	if (arch_get_random_int(&ret))
