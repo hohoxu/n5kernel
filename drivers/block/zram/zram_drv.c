@@ -956,7 +956,7 @@ static blk_qc_t zram_make_request(struct request_queue *queue, struct bio *bio)
 	if (unlikely(!zram_meta_get(zram)))
 		goto error;
 
-	blk_queue_split(queue, &bio, queue->bio_split);
+	blk_queue_split(queue, &bio);
 
 	if (!valid_io_request(zram, bio->bi_iter.bi_sector,
 					bio->bi_iter.bi_size)) {

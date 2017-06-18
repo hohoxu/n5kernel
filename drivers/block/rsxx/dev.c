@@ -151,7 +151,7 @@ static blk_qc_t rsxx_make_request(struct request_queue *q, struct bio *bio)
 	struct rsxx_bio_meta *bio_meta;
 	int st = -EINVAL;
 
-	blk_queue_split(q, &bio, q->bio_split);
+	blk_queue_split(q, &bio);
 
 	might_sleep();
 
