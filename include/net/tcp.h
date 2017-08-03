@@ -1859,6 +1859,17 @@ int tcpv4_offload_init(void);
 void tcp_v4_init(void);
 void tcp_init(void);
 
+/* At how many jiffies into the future should the RTO fire? */
+static inline s32 tcp_rto_delta(const struct sock *sk)
+{
+	const struct sk_buff *skb = tcp_write_queue_head(sk);
+	const u32 rto = inet_csk(sk)->icsk_rto;
+	const u32 rto_time_stamp =
+		tcp_skb_timestamp(skb) + rto;
+
+	return (s32)(rto_time_stamp - tcp_time_stamp);
+}
+
 /* tcp_recovery.c */
 
 /* Flags to enable various loss recovery features. See below */
