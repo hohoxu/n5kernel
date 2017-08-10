@@ -373,12 +373,25 @@ long reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 	long ret = timeout ? timeout : 1;
 
 retry:
-	fence = NULL;
 	shared_count = 0;
 	seq = read_seqcount_begin(&obj->seq);
 	rcu_read_lock();
 
-	if (wait_all) {
+	fence = rcu_dereference(obj->fence_excl);
+	if (fence && !test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		if (!fence_get_rcu(fence))
+			goto unlock_retry;
+
+		if (fence_is_signaled(fence)) {
+			fence_put(fence);
+			fence = NULL;
+		}
+
+	} else {
+		fence = NULL;
+	}
+
+	if (!fence && wait_all) {
 		struct reservation_object_list *fobj =
 						rcu_dereference(obj->fence);
 
@@ -401,21 +414,6 @@ retry:
 
 			fence = lfence;
 			break;
-		}
-	}
-
-	if (!shared_count) {
-		struct fence *fence_excl = rcu_dereference(obj->fence_excl);
-
-		if (fence_excl &&
-		    !test_bit(FENCE_FLAG_SIGNALED_BIT, &fence_excl->flags)) {
-			if (!fence_get_rcu(fence_excl))
-				goto unlock_retry;
-
-			if (fence_is_signaled(fence_excl))
-				fence_put(fence_excl);
-			else
-				fence = fence_excl;
 		}
 	}
 
