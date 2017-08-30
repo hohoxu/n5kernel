@@ -40,6 +40,8 @@
 
 struct kmem_cache *scsi_sdb_cache;
 
+static void scsi_mq_uninit_cmd(struct scsi_cmnd *cmd);
+
 /*
  * When to reinvoke queueing after a resource shortage. It's 3 msecs to
  * not change behaviour from the previous unplug mechanism, experimentation
@@ -88,6 +90,12 @@ static void scsi_mq_requeue_cmd(struct scsi_cmnd *cmd)
 	struct scsi_device *sdev = cmd->device;
 	struct request_queue *q = cmd->request->q;
 
+	if (cmd->request->cmd_flags & REQ_DONTPREP) {
+		cmd->request->cmd_flags &= ~REQ_DONTPREP;
+		scsi_mq_uninit_cmd(cmd);
+	} else {
+		WARN_ON_ONCE(true);
+	}
 	blk_mq_requeue_request(cmd->request);
 	blk_mq_kick_requeue_list(q);
 	put_device(&sdev->sdev_gendev);
@@ -976,8 +984,6 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 		 * A new command will be prepared and issued.
 		 */
 		if (q->mq_ops) {
-			cmd->request->cmd_flags &= ~REQ_DONTPREP;
-			scsi_mq_uninit_cmd(cmd);
 			scsi_mq_requeue_cmd(cmd);
 		} else {
 			scsi_release_buffers(cmd);
