@@ -1593,7 +1593,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i)
 		vm->ids[i] = NULL;
-	vm->va = RB_ROOT;
+	vm->va = RB_ROOT_CACHED;
 	vm->client_id = atomic64_inc_return(&adev->vm_manager.client_counter);
 	spin_lock_init(&vm->status_lock);
 	INIT_LIST_HEAD(&vm->invalidated);
@@ -1683,10 +1683,11 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 
 	amd_sched_entity_fini(vm->entity.sched, &vm->entity);
 
-	if (!RB_EMPTY_ROOT(&vm->va)) {
+	if (!RB_EMPTY_ROOT(&vm->va.rb_root)) {
 		dev_err(adev->dev, "still active bo inside vm\n");
 	}
-	rbtree_postorder_for_each_entry_safe(mapping, tmp, &vm->va, it.rb) {
+	rbtree_postorder_for_each_entry_safe(mapping, tmp,
+					     &vm->va.rb_root, it.rb) {
 		list_del(&mapping->list);
 		interval_tree_remove(&mapping->it, &vm->va);
 		kfree(mapping);
