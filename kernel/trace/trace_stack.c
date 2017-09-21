@@ -98,12 +98,6 @@ check_stack(unsigned long ip, unsigned long *stack)
 	local_irq_save(flags);
 	arch_spin_lock(&stack_trace_max_lock);
 
-	/*
-	 * RCU may not be watching, make it see us.
-	 * The stack trace code uses rcu_sched.
-	 */
-	rcu_irq_enter();
-
 	/* In case another CPU set the tracer_frame on us */
 	if (unlikely(!frame_size))
 		this_size -= tracer_frame;
@@ -196,7 +190,6 @@ check_stack(unsigned long ip, unsigned long *stack)
 	}
 
  out:
-	rcu_irq_exit();
 	arch_spin_unlock(&stack_trace_max_lock);
 	local_irq_restore(flags);
 }
