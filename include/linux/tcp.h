@@ -202,6 +202,7 @@ struct tcp_sock {
 		int			memory;
 		int			len;
 	} ucopy;
+	struct list_head tsorted_sent_queue; /* time-sorted sent but un-SACKed skbs */
 
 	u32	snd_wl1;	/* Sequence for window update		*/
 	u32	snd_wnd;	/* The window we expect to receive	*/
