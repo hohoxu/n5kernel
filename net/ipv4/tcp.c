@@ -2282,6 +2282,20 @@ static inline bool tcp_need_reset(int state)
 		TCPF_FIN_WAIT2 | TCPF_SYN_RECV | TCPF_SYN_SENT);
 }
 
+void tcp_write_queue_purge(struct sock *sk)
+{
+	struct sk_buff *skb;
+
+	while ((skb = __skb_dequeue(&sk->sk_write_queue)) != NULL) {
+		tcp_skb_tsorted_anchor_cleanup(skb);
+		sk_wmem_free_skb(sk, skb);
+	}
+	INIT_LIST_HEAD(&tcp_sk(sk)->tsorted_sent_queue);
+	sk_mem_reclaim(sk);
+	tcp_clear_all_retrans_hints(tcp_sk(sk));
+	inet_csk(sk)->icsk_backoff = 0;
+}
+
 int tcp_disconnect(struct sock *sk, int flags)
 {
 	struct inet_sock *inet = inet_sk(sk);
