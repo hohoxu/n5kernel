@@ -435,8 +435,10 @@ void tcp_init_sock(struct sock *sk)
 }
 EXPORT_SYMBOL(tcp_init_sock);
 
-static void tcp_tx_timestamp(struct sock *sk, u16 tsflags, struct sk_buff *skb)
+static void tcp_tx_timestamp(struct sock *sk, u16 tsflags)
 {
+	struct sk_buff *skb = tcp_write_queue_tail(sk);
+
 	if (tsflags && skb) {
 		struct skb_shared_info *shinfo = skb_shinfo(skb);
 		struct tcp_skb_cb *tcb = TCP_SKB_CB(skb);
@@ -1007,7 +1009,7 @@ wait_for_memory:
 
 out:
 	if (copied) {
-		tcp_tx_timestamp(sk, sk->sk_tsflags, tcp_write_queue_tail(sk));
+		tcp_tx_timestamp(sk, sk->sk_tsflags);
 		if (!(flags & MSG_SENDPAGE_NOTLAST))
 			tcp_push(sk, flags, mss_now, tp->nonagle, size_goal);
 	}
@@ -1351,7 +1353,7 @@ wait_for_memory:
 
 out:
 	if (copied) {
-		tcp_tx_timestamp(sk, sockc.tsflags, tcp_write_queue_tail(sk));
+		tcp_tx_timestamp(sk, sockc.tsflags);
 		tcp_push(sk, flags, mss_now, tp->nonagle, size_goal);
 	}
 out_nopush:
