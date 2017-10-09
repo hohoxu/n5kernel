@@ -350,6 +350,7 @@ struct sock *inet_csk_accept(struct sock *sk, int flags, int *err)
 		}
 		spin_unlock_bh(&queue->fastopenq.lock);
 	}
+	mem_cgroup_sk_alloc(newsk);
 out:
 	release_sock(sk);
 	if (req)
