@@ -951,10 +951,14 @@ list_update_cgroup_event(struct perf_event *event,
 	 * cpuctx->cgrp is NULL until a cgroup event is sched in or
 	 * ctx->nr_cgroup == 0 .
 	 */
-	if (add && perf_cgroup_from_task(current, ctx) == event->cgrp)
-		cpuctx->cgrp = event->cgrp;
-	else if (!add)
+	if (add) {
+		struct perf_cgroup *cgrp = perf_cgroup_from_task(current, ctx);
+
+		if (cgroup_is_descendant(cgrp->css.cgroup, event->cgrp->css.cgroup))
+			cpuctx->cgrp = cgrp;
+	} else {
 		cpuctx->cgrp = NULL;
+	}
 }
 
 #else /* !CONFIG_CGROUP_PERF */
