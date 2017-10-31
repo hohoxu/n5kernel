@@ -38,7 +38,6 @@
 
 /* via netdev_priv() */
 struct l2tp_eth {
-	struct net_device	*dev;
 	struct sock		*tunnel_sock;
 	struct l2tp_session	*session;
 	atomic_long_t		tx_bytes;
@@ -57,9 +56,6 @@ struct l2tp_eth_sess {
 
 static int l2tp_eth_dev_init(struct net_device *dev)
 {
-	struct l2tp_eth *priv = netdev_priv(dev);
-
-	priv->dev = dev;
 	eth_hw_addr_random(dev);
 	eth_broadcast_addr(dev->broadcast);
 	netdev_lockdep_set_classes(dev);
@@ -256,7 +252,6 @@ static int l2tp_eth_create(struct net *net, struct l2tp_tunnel *tunnel,
 	dev->needed_headroom += session->hdr_len;
 
 	priv = netdev_priv(dev);
-	priv->dev = dev;
 	priv->session = session;
 
 	priv->tunnel_sock = tunnel->sock;
