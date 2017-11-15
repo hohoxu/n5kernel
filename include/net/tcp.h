@@ -1645,8 +1645,6 @@ static inline bool tcp_rtx_and_write_queues_empty(const struct sock *sk)
 
 static inline void tcp_check_send_head(struct sock *sk, struct sk_buff *skb_unlinked)
 {
-	if (tcp_sk(sk)->highest_sack == skb_unlinked)
-		tcp_sk(sk)->highest_sack = NULL;
 }
 
 static inline void __tcp_add_write_queue_tail(struct sock *sk, struct sk_buff *skb)
@@ -1657,12 +1655,6 @@ static inline void __tcp_add_write_queue_tail(struct sock *sk, struct sk_buff *s
 static inline void tcp_add_write_queue_tail(struct sock *sk, struct sk_buff *skb)
 {
 	__tcp_add_write_queue_tail(sk, skb);
-
-	/* Queue it, remembering where we must start sending. */
-	if (sk->sk_write_queue.next == skb) {
-		if (tcp_sk(sk)->highest_sack == NULL)
-			tcp_sk(sk)->highest_sack = skb;
-	}
 }
 
 static inline void __tcp_add_write_queue_head(struct sock *sk, struct sk_buff *skb)
@@ -1725,9 +1717,7 @@ static inline u32 tcp_highest_sack_seq(struct tcp_sock *tp)
 
 static inline void tcp_advance_highest_sack(struct sock *sk, struct sk_buff *skb)
 {
-	struct sk_buff *next = skb_rb_next(skb);
-
-	tcp_sk(sk)->highest_sack = next ?: tcp_send_head(sk);
+	tcp_sk(sk)->highest_sack = skb_rb_next(skb);
 }
 
 static inline struct sk_buff *tcp_highest_sack(struct sock *sk)
@@ -1737,9 +1727,7 @@ static inline struct sk_buff *tcp_highest_sack(struct sock *sk)
 
 static inline void tcp_highest_sack_reset(struct sock *sk)
 {
-	struct sk_buff *skb = tcp_rtx_queue_head(sk);
-
-	tcp_sk(sk)->highest_sack = skb ?: tcp_send_head(sk);
+	tcp_sk(sk)->highest_sack = tcp_rtx_queue_head(sk);
 }
 
 /* Called when old skb is about to be deleted and replaced by new skb */
