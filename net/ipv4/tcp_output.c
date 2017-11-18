@@ -2242,7 +2242,7 @@ repair:
 
 		/* Send one loss probe per tail loss episode. */
 		if (push_one != 2)
-			tcp_schedule_loss_probe(sk);
+			tcp_schedule_loss_probe(sk, false);
 		is_cwnd_limited |= (tcp_packets_in_flight(tp) >= tp->snd_cwnd);
 		tcp_cwnd_validate(sk, is_cwnd_limited);
 		return false;
@@ -2250,7 +2250,7 @@ repair:
 	return !tp->packets_out && tcp_send_head(sk);
 }
 
-bool tcp_schedule_loss_probe(struct sock *sk)
+bool tcp_schedule_loss_probe(struct sock *sk, bool advancing_rto)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	u32 rtt = usecs_to_jiffies(tp->srtt_us >> 3);
@@ -2284,7 +2284,9 @@ bool tcp_schedule_loss_probe(struct sock *sk)
 	timeout = max_t(u32, timeout, msecs_to_jiffies(10));
 
 	/* If the RTO formula yields an earlier time, then use that time. */
-	rto_delta = tcp_rto_delta(sk);  /* How far in future is RTO? */
+	rto_delta = advancing_rto ?
+		    inet_csk(sk)->icsk_rto :
+		    tcp_rto_delta(sk);  /* How far in future is RTO? */
 	if (rto_delta > 0)
 		timeout = min_t(u32, timeout, rto_delta);
 
