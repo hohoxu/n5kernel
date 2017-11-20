@@ -2328,23 +2328,22 @@ SMB2_read(const unsigned int xid, struct cifs_io_parms *io_parms,
 
 	rsp = (struct smb2_read_rsp *)iov[0].iov_base;
 
-	if (rsp->hdr.Status == STATUS_END_OF_FILE) {
+	if (rc) {
+		if (rc != -ENODATA) {
+			cifs_stats_fail_inc(io_parms->tcon, SMB2_READ_HE);
+			cifs_dbg(VFS, "Send error in read = %d\n", rc);
+		}
 		free_rsp_buf(resp_buftype, iov[0].iov_base);
-		return 0;
+		return rc == -ENODATA ? 0 : rc;
 	}
 
-	if (rc) {
-		cifs_stats_fail_inc(io_parms->tcon, SMB2_READ_HE);
-		cifs_dbg(VFS, "Send error in read = %d\n", rc);
-	} else {
-		*nbytes = le32_to_cpu(rsp->DataLength);
-		if ((*nbytes > CIFS_MAX_MSGSIZE) ||
-		    (*nbytes > io_parms->length)) {
-			cifs_dbg(FYI, "bad length %d for count %d\n",
-				 *nbytes, io_parms->length);
-			rc = -EIO;
-			*nbytes = 0;
-		}
+	*nbytes = le32_to_cpu(rsp->DataLength);
+	if ((*nbytes > CIFS_MAX_MSGSIZE) ||
+	    (*nbytes > io_parms->length)) {
+		cifs_dbg(FYI, "bad length %d for count %d\n",
+			 *nbytes, io_parms->length);
+		rc = -EIO;
+		*nbytes = 0;
 	}
 
 	if (*buf) {
