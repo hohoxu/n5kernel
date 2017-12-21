@@ -518,9 +518,6 @@ hrtimer_force_reprogram(struct hrtimer_cpu_base *cpu_base, int skip_equal)
 {
 	ktime_t expires_next;
 
-	if (!__hrtimer_hres_active(cpu_base))
-		return;
-
 	expires_next = __hrtimer_get_next_event(cpu_base);
 
 	if (skip_equal && expires_next.tv64 == cpu_base->expires_next.tv64)
@@ -529,6 +526,9 @@ hrtimer_force_reprogram(struct hrtimer_cpu_base *cpu_base, int skip_equal)
 	cpu_base->expires_next.tv64 = expires_next.tv64;
 
 	/*
+	 * If hres is not active, hardware does not have to be
+	 * reprogrammed yet.
+	 *
 	 * If a hang was detected in the last timer interrupt then we
 	 * leave the hang delay active in the hardware. We want the
 	 * system to make progress. That also prevents the following
@@ -542,7 +542,7 @@ hrtimer_force_reprogram(struct hrtimer_cpu_base *cpu_base, int skip_equal)
 	 * set. So we'd effectivly block all timers until the T2 event
 	 * fires.
 	 */
-	if (cpu_base->hang_detected)
+	if (!__hrtimer_hres_active(cpu_base) || cpu_base->hang_detected)
 		return;
 
 	tick_program_event(cpu_base->expires_next, 1);
@@ -840,7 +840,6 @@ static void __remove_hrtimer(struct hrtimer *timer,
 	if (!timerqueue_del(&base->active, &timer->node))
 		cpu_base->active_bases &= ~(1 << base->index);
 
-#ifdef CONFIG_HIGH_RES_TIMERS
 	/*
 	 * Note: If reprogram is false we do not update
 	 * cpu_base->next_timer. This happens when we remove the first
@@ -851,7 +850,6 @@ static void __remove_hrtimer(struct hrtimer *timer,
 	 */
 	if (reprogram && timer == cpu_base->next_timer)
 		hrtimer_force_reprogram(cpu_base, 1);
-#endif
 
 out:
 	/*
