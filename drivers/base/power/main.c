@@ -1466,6 +1466,9 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
  End:
 	if (!error) {
 		dev->power.is_suspended = true;
+		if (device_may_wakeup(dev))
+			dev->power.wakeup_path = true;
+
 		dpm_propagate_to_parent(dev);
 	}
 
@@ -1585,7 +1588,7 @@ static int device_prepare(struct device *dev, pm_message_t state)
 
 	device_lock(dev);
 
-	dev->power.wakeup_path = device_may_wakeup(dev);
+	dev->power.wakeup_path = false;
 
 	if (dev->power.no_pm_callbacks) {
 		ret = 1;	/* Let device go direct_complete */
