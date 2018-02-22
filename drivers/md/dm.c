@@ -408,9 +408,11 @@ static int dm_blk_getgeo(struct block_device *bdev, struct hd_geometry *geo)
 	return dm_get_geometry(md, geo);
 }
 
-static int dm_grab_bdev_for_ioctl(struct mapped_device *md,
-				  struct block_device **bdev,
-				  fmode_t *mode)
+static char *_dm_claim_ptr = "I belong to device-mapper";
+
+static int dm_get_bdev_for_ioctl(struct mapped_device *md,
+				 struct block_device **bdev,
+				 fmode_t *mode)
 {
 	struct dm_target *tgt;
 	struct dm_table *map;
@@ -440,6 +442,10 @@ retry:
 		goto out;
 
 	bdgrab(*bdev);
+	r = blkdev_get(*bdev, *mode, _dm_claim_ptr);
+	if (r < 0)
+		goto out;
+
 	dm_put_live_table(md, srcu_idx);
 	return r;
 
@@ -458,7 +464,7 @@ static int dm_blk_ioctl(struct block_device *bdev, fmode_t mode,
 	struct mapped_device *md = bdev->bd_disk->private_data;
 	int r;
 
-	r = dm_grab_bdev_for_ioctl(md, &bdev, &mode);
+	r = dm_get_bdev_for_ioctl(md, &bdev, &mode);
 	if (r < 0)
 		return r;
 
@@ -475,7 +481,7 @@ static int dm_blk_ioctl(struct block_device *bdev, fmode_t mode,
 
 	r =  __blkdev_driver_ioctl(bdev, mode, cmd, arg);
 out:
-	bdput(bdev);
+	blkdev_put(bdev, mode);
 	return r;
 }
 
@@ -606,14 +612,13 @@ static void dm_put_live_table_fast(struct mapped_device *md) __releases(RCU)
 static int open_table_device(struct table_device *td, dev_t dev,
 			     struct mapped_device *md)
 {
-	static char *_claim_ptr = "I belong to device-mapper";
 	struct block_device *bdev;
 
 	int r;
 
 	BUG_ON(td->dm_dev.bdev);
 
-	bdev = blkdev_get_by_dev(dev, td->dm_dev.mode | FMODE_EXCL, _claim_ptr);
+	bdev = blkdev_get_by_dev(dev, td->dm_dev.mode | FMODE_EXCL, _dm_claim_ptr);
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);
 
@@ -2702,7 +2707,7 @@ static int dm_pr_reserve(struct block_device *bdev, u64 key, enum pr_type type,
 	fmode_t mode;
 	int r;
 
-	r = dm_grab_bdev_for_ioctl(md, &bdev, &mode);
+	r = dm_get_bdev_for_ioctl(md, &bdev, &mode);
 	if (r < 0)
 		return r;
 
@@ -2712,7 +2717,7 @@ static int dm_pr_reserve(struct block_device *bdev, u64 key, enum pr_type type,
 	else
 		r = -EOPNOTSUPP;
 
-	bdput(bdev);
+	blkdev_put(bdev, mode);
 	return r;
 }
 
@@ -2723,7 +2728,7 @@ static int dm_pr_release(struct block_device *bdev, u64 key, enum pr_type type)
 	fmode_t mode;
 	int r;
 
-	r = dm_grab_bdev_for_ioctl(md, &bdev, &mode);
+	r = dm_get_bdev_for_ioctl(md, &bdev, &mode);
 	if (r < 0)
 		return r;
 
@@ -2733,7 +2738,7 @@ static int dm_pr_release(struct block_device *bdev, u64 key, enum pr_type type)
 	else
 		r = -EOPNOTSUPP;
 
-	bdput(bdev);
+	blkdev_put(bdev, mode);
 	return r;
 }
 
@@ -2745,7 +2750,7 @@ static int dm_pr_preempt(struct block_device *bdev, u64 old_key, u64 new_key,
 	fmode_t mode;
 	int r;
 
-	r = dm_grab_bdev_for_ioctl(md, &bdev, &mode);
+	r = dm_get_bdev_for_ioctl(md, &bdev, &mode);
 	if (r < 0)
 		return r;
 
@@ -2755,7 +2760,7 @@ static int dm_pr_preempt(struct block_device *bdev, u64 old_key, u64 new_key,
 	else
 		r = -EOPNOTSUPP;
 
-	bdput(bdev);
+	blkdev_put(bdev, mode);
 	return r;
 }
 
@@ -2766,7 +2771,7 @@ static int dm_pr_clear(struct block_device *bdev, u64 key)
 	fmode_t mode;
 	int r;
 
-	r = dm_grab_bdev_for_ioctl(md, &bdev, &mode);
+	r = dm_get_bdev_for_ioctl(md, &bdev, &mode);
 	if (r < 0)
 		return r;
 
@@ -2776,7 +2781,7 @@ static int dm_pr_clear(struct block_device *bdev, u64 key)
 	else
 		r = -EOPNOTSUPP;
 
-	bdput(bdev);
+	blkdev_put(bdev, mode);
 	return r;
 }
 
