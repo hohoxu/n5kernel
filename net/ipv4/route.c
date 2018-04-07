@@ -2201,14 +2201,15 @@ struct rtable *__ip_route_output_key_hash(struct net *net, struct flowi4 *fl4,
 	struct net_device *dev_out = NULL;
 	__u8 tos = RT_FL_TOS(fl4);
 	unsigned int flags = 0;
-	struct fib_result res;
+	struct fib_result res = {
+		.type		= RTN_UNSPEC,
+		.fi		= NULL,
+		.table		= NULL,
+		.tclassid	= 0,
+	};
 	struct rtable *rth;
 	int orig_oif;
 	int err = -ENETUNREACH;
-
-	res.tclassid	= 0;
-	res.fi		= NULL;
-	res.table	= NULL;
 
 	orig_oif = fl4->flowi4_oif;
 
