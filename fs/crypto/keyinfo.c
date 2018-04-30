@@ -19,17 +19,16 @@
 
 static struct crypto_shash *essiv_hash_tfm;
 
-/**
- * derive_key_aes() - Derive a key using AES-128-ECB
- * @deriving_key: Encryption key used for derivation.
- * @source_key:   Source key to which to apply derivation.
- * @derived_raw_key:  Derived raw key.
+/*
+ * Key derivation function.  This generates the derived key by encrypting the
+ * master key with AES-128-ECB using the inode's nonce as the AES key.
  *
- * Return: Zero on success; non-zero otherwise.
+ * The master key must be at least as long as the derived key.  If the master
+ * key is longer, then only the first 'derived_keysize' bytes are used.
  */
-static int derive_key_aes(const u8 deriving_key[FS_KEY_DERIVATION_NONCE_SIZE],
-				const struct fscrypt_key *source_key,
-				u8 derived_raw_key[FS_MAX_KEY_SIZE])
+static int derive_key_aes(const u8 *master_key,
+			  const struct fscrypt_context *ctx,
+			  u8 *derived_key, unsigned int derived_keysize)
 {
 	int res = 0;
 	struct skcipher_request *req = NULL;
@@ -51,14 +50,13 @@ static int derive_key_aes(const u8 deriving_key[FS_KEY_DERIVATION_NONCE_SIZE],
 	skcipher_request_set_callback(req,
 			CRYPTO_TFM_REQ_MAY_BACKLOG | CRYPTO_TFM_REQ_MAY_SLEEP,
 			crypto_req_done, &wait);
-	res = crypto_skcipher_setkey(tfm, deriving_key,
-				     FS_KEY_DERIVATION_NONCE_SIZE);
+	res = crypto_skcipher_setkey(tfm, ctx->nonce, sizeof(ctx->nonce));
 	if (res < 0)
 		goto out;
 
-	sg_init_one(&src_sg, source_key->raw, source_key->size);
-	sg_init_one(&dst_sg, derived_raw_key, source_key->size);
-	skcipher_request_set_crypt(req, &src_sg, &dst_sg, source_key->size,
+	sg_init_one(&src_sg, master_key, derived_keysize);
+	sg_init_one(&dst_sg, derived_key, derived_keysize);
+	skcipher_request_set_crypt(req, &src_sg, &dst_sg, derived_keysize,
 				   NULL);
 	res = crypto_wait_req(crypto_skcipher_encrypt(req), &wait);
 out:
@@ -115,10 +113,9 @@ find_and_lock_process_key(const char *prefix,
 		goto invalid;
 	}
 
-	if (payload->size < min_keysize ||
-	    payload->size % AES_BLOCK_SIZE != 0) {
+	if (payload->size < min_keysize) {
 		fscrypt_warn(NULL,
-			     "key with description '%s' is too short or is misaligned (got %u bytes, need %u+ bytes)",
+			     "key with description '%s' is too short (got %u bytes, need %u+ bytes)",
 			     key->description, payload->size, min_keysize);
 		goto invalid;
 	}
@@ -175,7 +172,7 @@ out:
 =======
 	if (IS_ERR(key))
 		return PTR_ERR(key);
-	err = derive_key_aes(ctx->nonce, payload, derived_key);
+	err = derive_key_aes(payload->raw, ctx, derived_key, derived_keysize);
 	up_read(&key->sem);
 	key_put(key);
 	return err;
@@ -371,6 +368,7 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	 * crypto API as part of key derivation.
 	 */
 	res = -ENOMEM;
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 	res = validate_user_key(crypt_info, &ctx, FS_KEY_DESC_PREFIX,
@@ -386,6 +384,10 @@ int fscrypt_get_encryption_info(struct inode *inode)
 		}
 		res = 0;
 	} else if (res) {
+=======
+	raw_key = kmalloc(keysize, GFP_NOFS);
+	if (!raw_key)
+>>>>>>> 08ac7224b566... fscrypt: only derive the needed portion of the key
 		goto out;
 	}
 
@@ -416,11 +418,15 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	}
 	crypt_info->ci_ctfm = ctfm;
 	crypto_skcipher_set_flags(ctfm, CRYPTO_TFM_REQ_WEAK_KEY);
+<<<<<<< HEAD
 	/*
 	 * if the provided key is longer than keysize, we use the first
 	 * keysize bytes of the derived key only
 	 */
 	res = crypto_skcipher_setkey(ctfm, crypt_info->ci_raw_key, keysize);
+=======
+	res = crypto_skcipher_setkey(ctfm, raw_key, keysize);
+>>>>>>> 08ac7224b566... fscrypt: only derive the needed portion of the key
 	if (res)
 		goto out;
 
