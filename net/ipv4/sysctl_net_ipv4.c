@@ -49,6 +49,7 @@ static int tcp_use_userconfig_min;
 static int tcp_use_userconfig_max = 1;
 static u32 u32_max_div_HZ = UINT_MAX / HZ;
 static int one_day_secs = 24 * 3600;
+static int comp_sack_nr_max = 255;
 
 /* Update system visible IP port range */
 static void set_local_port_range(struct net *net, int range[2])
@@ -1036,6 +1037,15 @@ static struct ctl_table ipv4_net_table[] = {
 		.maxlen		= sizeof(unsigned long),
 		.mode		= 0644,
 		.proc_handler	= proc_doulongvec_minmax,
+	},
+	{
+		.procname	= "tcp_comp_sack_nr",
+		.data		= &init_net.ipv4.sysctl_tcp_comp_sack_nr,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &comp_sack_nr_max,
 	},
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 	{
