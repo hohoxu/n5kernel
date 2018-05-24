@@ -378,4 +378,11 @@ static inline struct sbq_wait_state *sbq_wait_ptr(struct sbitmap_queue *sbq,
  */
 void sbitmap_queue_wake_all(struct sbitmap_queue *sbq);
 
+/**
+ * sbitmap_queue_wake_up() - Wake up some of waiters in one waitqueue
+ * on a &struct sbitmap_queue.
+ * @sbq: Bitmap queue to wake up.
+ */
+void sbitmap_queue_wake_up(struct sbitmap_queue *sbq);
+
 #endif /* __LINUX_SCALE_BITMAP_H */

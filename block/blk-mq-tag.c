@@ -113,6 +113,8 @@ static int bt_get(struct blk_mq_alloc_data *data, struct sbitmap_queue *bt,
 
 	ws = bt_wait_ptr(bt, hctx);
 	do {
+		struct sbitmap_queue *bt_prev;
+
 		prepare_to_wait(&ws->wait, &wait, TASK_UNINTERRUPTIBLE);
 
 		tag = __bt_get(hctx, bt);
@@ -138,6 +140,7 @@ static int bt_get(struct blk_mq_alloc_data *data, struct sbitmap_queue *bt,
 
 		blk_mq_put_ctx(data->ctx);
 
+		bt_prev = bt;
 		io_schedule();
 
 		data->ctx = blk_mq_get_ctx(data->q);
@@ -149,6 +152,15 @@ static int bt_get(struct blk_mq_alloc_data *data, struct sbitmap_queue *bt,
 			bt = &hctx->tags->bitmap_tags;
 		}
 		finish_wait(&ws->wait, &wait);
+
+		/*
+		 * If destination hw queue is changed, fake wake up on
+		 * previous queue for compensating the wake up miss, so
+		 * other allocations on previous queue won't be starved.
+		 */
+		if (bt != bt_prev)
+			sbitmap_queue_wake_up(bt_prev);
+
 		ws = bt_wait_ptr(bt, hctx);
 	} while (1);
 
