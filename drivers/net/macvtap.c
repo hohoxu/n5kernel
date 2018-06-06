@@ -821,6 +821,7 @@ static ssize_t macvtap_put_user(struct macvtap_queue *q,
 	int total;
 
 	if (q->flags & IFF_VNET_HDR) {
+		int vlan_hlen = skb_vlan_tag_present(skb) ? VLAN_HLEN : 0;
 		struct virtio_net_hdr vnet_hdr;
 		vnet_hdr_len = READ_ONCE(q->vnet_hdr_sz);
 		if (iov_iter_count(iter) < vnet_hdr_len)
@@ -828,7 +829,7 @@ static ssize_t macvtap_put_user(struct macvtap_queue *q,
 
 		ret = virtio_net_hdr_from_skb(skb, &vnet_hdr,
 					      macvtap_is_little_endian(q),
-					      true);
+					      true, vlan_hlen);
 		if (ret)
 			BUG();
 
