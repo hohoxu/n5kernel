@@ -227,8 +227,12 @@ socket_match(const struct sk_buff *skb, struct xt_action_param *par,
 	struct sk_buff *pskb = (struct sk_buff *)skb;
 	struct sock *sk = skb->sk;
 
+	if (!net_eq(par->net, sock_net(sk)))
+		sk = NULL;
+
 	if (!sk)
 		sk = xt_socket_lookup_slow_v4(par->net, skb, par->in);
+
 	if (sk) {
 		bool wildcard;
 		bool transparent = true;
@@ -418,8 +422,12 @@ socket_mt6_v1_v2_v3(const struct sk_buff *skb, struct xt_action_param *par)
 	struct sk_buff *pskb = (struct sk_buff *)skb;
 	struct sock *sk = skb->sk;
 
+	if (!net_eq(par->net, sock_net(sk)))
+		sk = NULL;
+
 	if (!sk)
 		sk = xt_socket_lookup_slow_v6(par->net, skb, par->in);
+
 	if (sk) {
 		bool wildcard;
 		bool transparent = true;
