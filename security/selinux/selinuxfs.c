@@ -426,16 +426,11 @@ static ssize_t sel_read_policy(struct file *filp, char __user *buf,
 	struct policy_load_memory *plm = filp->private_data;
 	int ret;
 
-	mutex_lock(&sel_mutex);
-
 	ret = task_has_security(current, SECURITY__READ_POLICY);
 	if (ret)
-		goto out;
+		return ret;
 
-	ret = simple_read_from_buffer(buf, count, ppos, plm->data, plm->len);
-out:
-	mutex_unlock(&sel_mutex);
-	return ret;
+	return simple_read_from_buffer(buf, count, ppos, plm->data, plm->len);
 }
 
 static int sel_mmap_policy_fault(struct vm_area_struct *vma,
@@ -1109,25 +1104,29 @@ static ssize_t sel_read_bool(struct file *filep, char __user *buf,
 
 	ret = -EINVAL;
 	if (index >= bool_num || strcmp(name, bool_pending_names[index]))
-		goto out;
+		goto out_unlock;
 
 	ret = -ENOMEM;
 	page = (char *)get_zeroed_page(GFP_KERNEL);
 	if (!page)
-		goto out;
+		goto out_unlock;
 
 	cur_enforcing = security_get_bool_value(index);
 	if (cur_enforcing < 0) {
 		ret = cur_enforcing;
-		goto out;
+		goto out_unlock;
 	}
 	length = scnprintf(page, PAGE_SIZE, "%d %d", cur_enforcing,
 			  bool_pending_values[index]);
-	ret = simple_read_from_buffer(buf, count, ppos, page, length);
-out:
 	mutex_unlock(&sel_mutex);
+	ret = simple_read_from_buffer(buf, count, ppos, page, length);
+out_free:
 	free_page((unsigned long)page);
 	return ret;
+
+out_unlock:
+	mutex_unlock(&sel_mutex);
+	goto out_free;
 }
 
 static ssize_t sel_write_bool(struct file *filep, const char __user *buf,
@@ -1139,6 +1138,17 @@ static ssize_t sel_write_bool(struct file *filep, const char __user *buf,
 	unsigned index = file_inode(filep)->i_ino & SEL_INO_MASK;
 	const char *name = filep->f_path.dentry->d_name.name;
 
+	if (count >= PAGE_SIZE)
+		return -ENOMEM;
+
+	/* No partial writes. */
+	if (*ppos != 0)
+		return -EINVAL;
+
+	page = memdup_user_nul(buf, count);
+	if (IS_ERR(page))
+		return PTR_ERR(page);
+
 	mutex_lock(&sel_mutex);
 
 	length = task_has_security(current, SECURITY__SETBOOL);
@@ -1148,22 +1158,6 @@ static ssize_t sel_write_bool(struct file *filep, const char __user *buf,
 	length = -EINVAL;
 	if (index >= bool_num || strcmp(name, bool_pending_names[index]))
 		goto out;
-
-	length = -ENOMEM;
-	if (count >= PAGE_SIZE)
-		goto out;
-
-	/* No partial writes. */
-	length = -EINVAL;
-	if (*ppos != 0)
-		goto out;
-
-	page = memdup_user_nul(buf, count);
-	if (IS_ERR(page)) {
-		length = PTR_ERR(page);
-		page = NULL;
-		goto out;
-	}
 
 	length = -EINVAL;
 	if (sscanf(page, "%d", &new_value) != 1)
@@ -1195,27 +1189,22 @@ static ssize_t sel_commit_bools_write(struct file *filep,
 	ssize_t length;
 	int new_value;
 
+	if (count >= PAGE_SIZE)
+		return -ENOMEM;
+
+	/* No partial writes. */
+	if (*ppos != 0)
+		return -EINVAL;
+
+	page = memdup_user_nul(buf, count);
+	if (IS_ERR(page))
+		return PTR_ERR(page);
+
 	mutex_lock(&sel_mutex);
 
 	length = task_has_security(current, SECURITY__SETBOOL);
 	if (length)
 		goto out;
-
-	length = -ENOMEM;
-	if (count >= PAGE_SIZE)
-		goto out;
-
-	/* No partial writes. */
-	length = -EINVAL;
-	if (*ppos != 0)
-		goto out;
-
-	page = memdup_user_nul(buf, count);
-	if (IS_ERR(page)) {
-		length = PTR_ERR(page);
-		page = NULL;
-		goto out;
-	}
 
 	length = -EINVAL;
 	if (sscanf(page, "%d", &new_value) != 1)
