@@ -92,14 +92,14 @@ int cam_tasklet_get_cmd(
     struct cam_tasklet_queue_cmd   *tasklet_cmd = NULL;
 
 	if (!atomic_read(&tasklet->tasklet_active)) {
-		CAM_ERR_RATE_LIMIT(CAM_ISP, "Tasklet is not active!\n");
+		CAM_ERR_RATE_LIMIT(CAM_ISP, "Tasklet is not active");
 		rc = -EPIPE;
 		return rc;
 	}
 
 	spin_lock_irqsave(&tasklet->tasklet_lock, flags);
 	if (list_empty(&tasklet->free_cmd_list)) {
-		CAM_ERR_RATE_LIMIT(CAM_ISP, "No more free tasklet cmd!\n");
+		CAM_ERR_RATE_LIMIT(CAM_ISP, "No more free tasklet cmd");
 		rc = -ENODEV;
 		goto spin_unlock;
 	} else {
@@ -197,8 +197,8 @@ int cam_tasklet_enqueue_cmd(
 		return -EINVAL;
 	}
 
-	if (!bh_cmd) {
-		CAM_ERR_RATE_LIMIT(CAM_ISP, "NULL bh cmd");
+	if (!atomic_read(&tasklet->tasklet_active)) {
+		CAM_ERR_RATE_LIMIT(CAM_ISP, "Tasklet is not active\n");
 		return -EINVAL;
 	}
 
@@ -210,7 +210,6 @@ int cam_tasklet_enqueue_cmd(
 		&tasklet->used_cmd_list);
 	spin_unlock_irqrestore(&tasklet->tasklet_lock, flags);
 	tasklet_schedule(&tasklet->tasklet);
-
 	return rc;
 }
 
