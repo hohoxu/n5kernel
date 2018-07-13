@@ -535,6 +535,22 @@ static inline void start_usb_peripheral(struct usbpd *pd)
 	extcon_set_state_sync(pd->extcon, EXTCON_USB, 1);
 }
 
+static void notify_pd_contract_status(struct usbpd *pd)
+{
+	int ret = 0;
+	union extcon_property_value val;
+
+	if (!pd)
+		return;
+
+	val.intval = pd->in_explicit_contract;
+	extcon_set_property(pd->extcon, EXTCON_USB,
+			EXTCON_PROP_USB_PD_CONTRACT, val);
+	ret = extcon_blocking_sync(pd->extcon, EXTCON_USB, 0);
+	if (ret)
+		usbpd_err(&pd->dev, "err(%d) while notifying pd status", ret);
+}
+
 /**
  * This API allows client driver to request for releasing SS lanes. It should
  * not be called from atomic context.
@@ -1259,6 +1275,7 @@ static void usbpd_set_state(struct usbpd *pd, enum usbpd_state next_state)
 
 	case PE_SRC_READY:
 		pd->in_explicit_contract = true;
+		notify_pd_contract_status(pd);
 
 		if (pd->vdm_tx)
 			kick_sm(pd, 0);
@@ -1404,6 +1421,7 @@ static void usbpd_set_state(struct usbpd *pd, enum usbpd_state next_state)
 
 	case PE_SNK_READY:
 		pd->in_explicit_contract = true;
+		notify_pd_contract_status(pd);
 
 		if (pd->vdm_tx)
 			kick_sm(pd, 0);
@@ -1439,6 +1457,7 @@ static void usbpd_set_state(struct usbpd *pd, enum usbpd_state next_state)
 				POWER_SUPPLY_PROP_PD_CURRENT_MAX, &val);
 
 		pd->in_explicit_contract = false;
+		notify_pd_contract_status(pd);
 
 		/*
 		 * need to update PR bit in message header so that
@@ -2002,6 +2021,7 @@ static void usbpd_sm(struct work_struct *w)
 		pd->in_pr_swap = false;
 		pd->pd_connected = false;
 		pd->in_explicit_contract = false;
+		notify_pd_contract_status(pd);
 		pd->hard_reset_recvd = false;
 		pd->caps_count = 0;
 		pd->hard_reset_count = 0;
@@ -2085,6 +2105,7 @@ static void usbpd_sm(struct work_struct *w)
 				POWER_SUPPLY_PROP_PR_SWAP, &val);
 
 		pd->in_explicit_contract = false;
+		notify_pd_contract_status(pd);
 		pd->selected_pdo = pd->requested_pdo = 0;
 		pd->rdo = 0;
 		rx_msg_cleanup(pd);
@@ -2304,6 +2325,7 @@ static void usbpd_sm(struct work_struct *w)
 
 		pd_send_hard_reset(pd);
 		pd->in_explicit_contract = false;
+		notify_pd_contract_status(pd);
 		pd->rdo = 0;
 		rx_msg_cleanup(pd);
 		reset_vdm_state(pd);
@@ -2754,6 +2776,7 @@ static void usbpd_sm(struct work_struct *w)
 
 		pd_send_hard_reset(pd);
 		pd->in_explicit_contract = false;
+		notify_pd_contract_status(pd);
 		pd->selected_pdo = pd->requested_pdo = 0;
 		pd->rdo = 0;
 		reset_vdm_state(pd);
@@ -2785,6 +2808,7 @@ static void usbpd_sm(struct work_struct *w)
 		power_supply_set_property(pd->usb_psy,
 				POWER_SUPPLY_PROP_PR_SWAP, &val);
 		pd->in_explicit_contract = false;
+		notify_pd_contract_status(pd);
 
 		if (pd->vbus_enabled) {
 			regulator_disable(pd->vbus);
@@ -4090,6 +4114,8 @@ struct usbpd *usbpd_create(struct device *parent)
 	/* Support reporting polarity and speed via properties */
 	extcon_set_property_capability(pd->extcon, EXTCON_USB,
 			EXTCON_PROP_USB_TYPEC_POLARITY);
+	extcon_set_property_capability(pd->extcon, EXTCON_USB,
+			EXTCON_PROP_USB_PD_CONTRACT);
 	extcon_set_property_capability(pd->extcon, EXTCON_USB,
 			EXTCON_PROP_USB_SS);
 	extcon_set_property_capability(pd->extcon, EXTCON_USB_HOST,
