@@ -118,6 +118,10 @@ enum {
 #define TCP_REPAIR_WINDOW	29	/* Get/set window parameters */
 #define TCP_FASTOPEN_CONNECT	30	/* Attempt FastOpen with connect */
 
+#define TCP_REPAIR_ON		1
+#define TCP_REPAIR_OFF		0
+#define TCP_REPAIR_OFF_NO_WP	-1	/* Turn off without window probes */
+
 struct tcp_repair_opt {
 	__u32	opt_code;
 	__u32	opt_val;
