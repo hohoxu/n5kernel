@@ -346,7 +346,7 @@ static void send_sig_all(int sig)
 		if (is_global_init(p))
 			continue;
 
-		do_send_sig_info(sig, SEND_SIG_FORCED, p, true);
+		do_send_sig_info(sig, SEND_SIG_PRIV, p, true);
 	}
 	read_unlock(&tasklist_lock);
 }
