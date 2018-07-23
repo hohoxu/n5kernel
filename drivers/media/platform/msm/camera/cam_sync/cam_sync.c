@@ -1046,6 +1046,7 @@ static struct platform_driver cam_sync_driver = {
 	.driver = {
 		.name = "cam_sync",
 		.owner = THIS_MODULE,
+		.suppress_bind_attrs = true,
 	},
 };
 
