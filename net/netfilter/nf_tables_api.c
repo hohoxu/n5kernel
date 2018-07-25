@@ -2800,7 +2800,7 @@ static int nf_tables_newset(struct net *net, struct sock *nlsk,
 	struct nft_set *set;
 	struct nft_ctx ctx;
 	char name[NFT_SET_MAXNAMELEN];
-	unsigned int size;
+	u64 size;
 	bool create;
 	u64 timeout;
 	u32 ktype, dtype, flags, policy, gc_int;
