@@ -2250,7 +2250,6 @@ repair:
 
 bool tcp_schedule_loss_probe(struct sock *sk)
 {
-	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	u32 rtt = usecs_to_jiffies(tp->srtt_us >> 3);
 	u32 timeout, rto_delta;
