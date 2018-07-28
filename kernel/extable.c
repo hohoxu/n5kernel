@@ -98,7 +98,11 @@ int core_kernel_data(unsigned long addr)
 
 int __kernel_text_address(unsigned long addr)
 {
-	if (kernel_text_address(addr))
+	if (core_kernel_text(addr))
+		return 1;
+	if (is_module_text_address(addr))
+		return 1;
+	if (is_ftrace_trampoline(addr))
 		return 1;
 	/*
 	 * There might be init symbols in saved stacktraces.
