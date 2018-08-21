@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
+
 #include "cam_io_util.h"
 #include "cam_irq_controller.h"
 #include "cam_debug_util.h"
@@ -170,14 +171,16 @@ int cam_irq_controller_init(const char       *name,
 		kzalloc(register_info->num_registers * sizeof(uint32_t),
 		GFP_KERNEL);
 	if (!controller->th_payload.evt_status_arr) {
-		CAM_DBG(CAM_ISP, "Failed to allocate BH payload bit mask Arr");
+		CAM_DBG(CAM_ISP,
+			"Failed to allocate BH payload bit mask Arr");
 		rc = -ENOMEM;
 		goto evt_mask_alloc_error;
 	}
 
 	controller->name = name;
 
-	CAM_DBG(CAM_ISP, "num_registers: %d", register_info->num_registers);
+	CAM_DBG(CAM_ISP, "num_registers: %d",
+		register_info->num_registers);
 	for (i = 0; i < register_info->num_registers; i++) {
 		controller->irq_register_arr[i].index = i;
 		controller->irq_register_arr[i].mask_reg_offset =
@@ -202,7 +205,8 @@ int cam_irq_controller_init(const char       *name,
 		controller->global_clear_bitmask);
 	CAM_DBG(CAM_ISP, "global_clear_offset: 0x%x",
 		controller->global_clear_offset);
-	CAM_DBG(CAM_ISP, "mem_base: %pK", (void __iomem *)controller->mem_base);
+	CAM_DBG(CAM_ISP, "mem_base: %pK",
+		(void __iomem *)controller->mem_base);
 
 	INIT_LIST_HEAD(&controller->evt_handler_list_head);
 	for (i = 0; i < CAM_IRQ_PRIORITY_MAX; i++)
@@ -264,6 +268,18 @@ int cam_irq_controller_subscribe_irq(void *irq_controller,
 		return -EINVAL;
 	}
 
+	if (irq_bh_api &&
+		(!irq_bh_api->bottom_half_enqueue_func ||
+		!irq_bh_api->get_bh_payload_func ||
+		!irq_bh_api->put_bh_payload_func)) {
+		CAM_ERR(CAM_ISP,
+			"Invalid: enqueue_func=%pK get_bh=%pK put_bh=%pK",
+			irq_bh_api->bottom_half_enqueue_func,
+			irq_bh_api->get_bh_payload_func,
+			irq_bh_api->put_bh_payload_func);
+		return -EINVAL;
+	}
+
 	if (priority >= CAM_IRQ_PRIORITY_MAX) {
 		CAM_ERR(CAM_ISP, "Invalid priority=%u, max=%u", priority,
 			CAM_IRQ_PRIORITY_MAX);
@@ -297,8 +313,8 @@ int cam_irq_controller_subscribe_irq(void *irq_controller,
 	evt_handler->bottom_half              = bottom_half;
 	evt_handler->index                    = controller->hdl_idx++;
 
-    if (irq_bh_api)
-        evt_handler->irq_bh_api               = *irq_bh_api;
+	if (irq_bh_api)
+		evt_handler->irq_bh_api       = *irq_bh_api;
 
 	/* Avoid rollover to negative values */
 	if (controller->hdl_idx > 0x3FFFFFFF)
@@ -437,13 +453,13 @@ int cam_irq_controller_disable_irq(void *irq_controller, uint32_t handle)
 
 		irq_mask = cam_io_r_mb(controller->mem_base +
 			irq_register->mask_reg_offset);
-		CAM_INFO(CAM_ISP, "irq_mask 0x%x before disable 0x%x",
+		CAM_DBG(CAM_ISP, "irq_mask 0x%x before disable 0x%x",
 			irq_register->mask_reg_offset, irq_mask);
 		irq_mask &= ~(evt_handler->evt_bit_mask_arr[i]);
 
 		cam_io_w_mb(irq_mask, controller->mem_base +
 			irq_register->mask_reg_offset);
-		CAM_INFO(CAM_ISP, "irq_mask 0x%x after disable 0x%x",
+		CAM_DBG(CAM_ISP, "irq_mask 0x%x after disable 0x%x",
 			irq_register->mask_reg_offset, irq_mask);
 
 		/* Clear the IRQ bits of this handler */
@@ -566,8 +582,8 @@ static void cam_irq_controller_th_processing(
 	bool                            is_irq_match;
 	int                             rc = -EINVAL;
 	int                             i;
-    void                           *bh_cmd = NULL;
-    struct cam_irq_bh_api          *irq_bh_api = NULL;
+	void                           *bh_cmd = NULL;
+	struct cam_irq_bh_api          *irq_bh_api = NULL;
 
 	CAM_DBG(CAM_ISP, "Enter");
 
@@ -592,50 +608,42 @@ static void cam_irq_controller_th_processing(
 				evt_handler->evt_bit_mask_arr[i];
 		}
 
-        irq_bh_api = &evt_handler->irq_bh_api;
-        bh_cmd = NULL;
-        
-        if (irq_bh_api->get_bh_payload_func) {
-            if (irq_bh_api->get_bh_payload_func(
-                evt_handler->bottom_half, &bh_cmd)) {
-                CAM_ERR(CAM_ISP, "Can't get bh payload");
-                continue;
-            }
-        }
+		irq_bh_api = &evt_handler->irq_bh_api;
+		bh_cmd = NULL;
+
+		if (evt_handler->bottom_half_handler) {
+			rc = irq_bh_api->get_bh_payload_func(
+				evt_handler->bottom_half, &bh_cmd);
+			if (rc || !bh_cmd) {
+				CAM_ERR(CAM_ISP, "Can't get bh payload");
+				continue;
+			}
+		}
 
 		/*
 		 * irq_status_arr[0] is dummy argument passed. the entire
 		 * status array is passed in th_payload.
 		 */
-		if (evt_handler->top_half_handler) {
+		if (evt_handler->top_half_handler)
 			rc = evt_handler->top_half_handler(
 				controller->irq_status_arr[0],
 				(void *)th_payload);
-            if (rc) {
-                CAM_ERR(CAM_ISP,
-                    "Top half handler failed with %d", rc);
-                if (irq_bh_api->put_bh_payload_func && bh_cmd) {
-                    if (irq_bh_api->put_bh_payload_func(
-                        evt_handler->bottom_half,
-                        &bh_cmd)) {
-                        CAM_ERR(CAM_ISP,
-                            "Can't put bh payload");
-                    }
-                }
-                continue;
-            }
-        }
 
-		if (!rc && evt_handler->bottom_half_handler) {
+		if (rc && bh_cmd) {
+			irq_bh_api->put_bh_payload_func(
+				evt_handler->bottom_half, &bh_cmd);
+			continue;
+		}
+
+		if (evt_handler->bottom_half_handler) {
 			CAM_DBG(CAM_ISP, "Enqueuing bottom half for %s",
 				controller->name);
-            if (irq_bh_api->bottom_half_enqueue_func) {
-                irq_bh_api->bottom_half_enqueue_func(
-					evt_handler->bottom_half,
-					bh_cmd,
-					th_payload->evt_payload_priv,
-					evt_handler->bottom_half_handler);
-			}
+			irq_bh_api->bottom_half_enqueue_func(
+				evt_handler->bottom_half,
+				bh_cmd,
+				evt_handler->handler_priv,
+				th_payload->evt_payload_priv,
+				evt_handler->bottom_half_handler);
 		}
 	}
 
