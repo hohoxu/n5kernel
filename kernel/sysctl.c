@@ -2785,17 +2785,16 @@ static int do_proc_dopipe_max_size_conv(bool *negp, unsigned long *lvalp,
 	struct do_proc_dopipe_max_size_conv_param *param = data;
 
 	if (write) {
-		unsigned int val;
+		unsigned int val = round_pipe_size(*lvalp);
 
-		if (*lvalp > UINT_MAX)
-			return -EINVAL;
-
-		val = round_pipe_size(*lvalp);
 		if (*negp || val == 0)
 			return -EINVAL;
 
 		if (param->min && *param->min > val)
 			return -ERANGE;
+
+		if (*lvalp > UINT_MAX)
+			return -EINVAL;
 
 		*valp = val;
 	} else {
