@@ -37,6 +37,7 @@
 #include <linux/regset.h>
 #include <linux/tracehook.h>
 #include <linux/elf.h>
+#include <linux/nospec.h>
 
 #include <asm/compat.h>
 #include <asm/debug-monitors.h>
