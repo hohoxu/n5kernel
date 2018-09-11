@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017, Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2018, Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -78,6 +78,7 @@ struct lsm_module_param_ids {
 	uint32_t param_id;
 };
 
+static DEFINE_MUTEX(session_lock);
 static struct lsm_common lsm_common;
 /*
  * mmap_handle_p can point either client->sound_model.mem_map_handle or
@@ -130,6 +131,24 @@ static void q6lsm_set_param_common(
 	}
 }
 
+static int q6lsm_get_session_id_from_lsm_client(struct lsm_client *client)
+{
+	int n;
+
+	for (n = LSM_MIN_SESSION_ID; n <= LSM_MAX_SESSION_ID; n++) {
+		if (lsm_session[n] == client)
+			return n;
+	}
+	pr_err("%s: cannot find matching lsm client. client = %pa\n",
+		__func__, client);
+	return LSM_INVALID_SESSION_ID;
+}
+
+static bool q6lsm_is_valid_lsm_client(struct lsm_client *client)
+{
+	return q6lsm_get_session_id_from_lsm_client(client) ? 1 : 0;
+}
+
 static int q6lsm_callback(struct apr_client_data *data, void *priv)
 {
 	struct lsm_client *client = (struct lsm_client *)priv;
@@ -148,6 +167,13 @@ static int q6lsm_callback(struct apr_client_data *data, void *priv)
 			 __func__, data->opcode, data->reset_event,
 			 data->reset_proc);
 
+		mutex_lock(&session_lock);
+		if (!client || !q6lsm_is_valid_lsm_client(client)) {
+			pr_err("%s: client already freed/invalid, return\n",
+				__func__);
+			mutex_unlock(&session_lock);
+			return 0;
+		}
 		apr_reset(client->apr);
 		client->apr = NULL;
 		atomic_set(&client->cmd_state, CMD_STATE_CLEARED);
@@ -157,6 +183,7 @@ static int q6lsm_callback(struct apr_client_data *data, void *priv)
 		mutex_lock(&lsm_common.cal_data[LSM_CUSTOM_TOP_IDX]->lock);
 		lsm_common.set_custom_topology = 1;
 		mutex_unlock(&lsm_common.cal_data[LSM_CUSTOM_TOP_IDX]->lock);
+		mutex_unlock(&session_lock);
 		return 0;
 	}
 
@@ -315,6 +342,11 @@ struct lsm_client *q6lsm_client_alloc(lsm_app_cb cb, void *priv)
 		kfree(client);
 		return NULL;
 	}
+
+	init_waitqueue_head(&client->cmd_wait);
+	mutex_init(&client->cmd_lock);
+	atomic_set(&client->cmd_state, CMD_STATE_CLEARED);
+
 	pr_debug("%s: Client Session %d\n", __func__, client->session);
 	client->apr = apr_register("ADSP", "LSM", q6lsm_callback,
 				   ((client->session) << 8 | client->session),
@@ -332,9 +364,6 @@ struct lsm_client *q6lsm_client_alloc(lsm_app_cb cb, void *priv)
 		goto fail;
 	}
 
-	init_waitqueue_head(&client->cmd_wait);
-	mutex_init(&client->cmd_lock);
-	atomic_set(&client->cmd_state, CMD_STATE_CLEARED);
 	pr_debug("%s: New client allocated\n", __func__);
 	return client;
 fail:
@@ -350,6 +379,7 @@ void q6lsm_client_free(struct lsm_client *client)
 		pr_err("%s: Invalid Session %d\n", __func__, client->session);
 		return;
 	}
+	mutex_lock(&session_lock);
 	apr_deregister(client->apr);
 	client->mmap_apr = NULL;
 	q6lsm_session_free(client);
@@ -357,6 +387,7 @@ void q6lsm_client_free(struct lsm_client *client)
 	mutex_destroy(&client->cmd_lock);
 	kfree(client);
 	client = NULL;
+	mutex_unlock(&session_lock);
 }
 
 /*
