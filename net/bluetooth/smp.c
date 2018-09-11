@@ -81,6 +81,7 @@ enum {
 
 struct smp_dev {
 	/* Secure Connections OOB data */
+	bool			local_oob;
 	u8			local_pk[64];
 	u8			local_sk[32];
 	u8			local_rand[16];
@@ -578,6 +579,8 @@ int smp_generate_oob(struct hci_dev *hdev, u8 hash[16], u8 rand[16])
 		return err;
 
 	memcpy(rand, smp->local_rand, 16);
+
+	smp->local_oob = true;
 
 	return 0;
 }
@@ -1731,7 +1734,7 @@ static u8 smp_cmd_pairing_req(struct l2cap_conn *conn, struct sk_buff *skb)
 	 * successfully received our local OOB data - therefore set the
 	 * flag to indicate that local OOB is in use.
 	 */
-	if (req->oob_flag == SMP_OOB_PRESENT)
+	if (req->oob_flag == SMP_OOB_PRESENT && SMP_DEV(hdev)->local_oob)
 		set_bit(SMP_FLAG_LOCAL_OOB, &smp->flags);
 
 	/* SMP over BR/EDR requires special treatment */
@@ -1907,7 +1910,7 @@ static u8 smp_cmd_pairing_rsp(struct l2cap_conn *conn, struct sk_buff *skb)
 	 * successfully received our local OOB data - therefore set the
 	 * flag to indicate that local OOB is in use.
 	 */
-	if (rsp->oob_flag == SMP_OOB_PRESENT)
+	if (rsp->oob_flag == SMP_OOB_PRESENT && SMP_DEV(hdev)->local_oob)
 		set_bit(SMP_FLAG_LOCAL_OOB, &smp->flags);
 
 	smp->prsp[0] = SMP_CMD_PAIRING_RSP;
@@ -3143,6 +3146,7 @@ static struct l2cap_chan *smp_add_cid(struct hci_dev *hdev, u16 cid)
 		return ERR_CAST(tfm_cmac);
 	}
 
+	smp->local_oob = false;
 	smp->tfm_aes = tfm_aes;
 	smp->tfm_cmac = tfm_cmac;
 	smp->min_key_size = SMP_MIN_ENC_KEY_SIZE;
