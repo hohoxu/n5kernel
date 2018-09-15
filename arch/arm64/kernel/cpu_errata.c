@@ -17,6 +17,7 @@
  */
 
 #include <linux/types.h>
+#include <asm/cachetype.h>
 #include <asm/cpu.h>
 #include <asm/cputype.h>
 #include <asm/cpufeature.h>
