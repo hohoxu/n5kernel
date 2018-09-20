@@ -245,8 +245,11 @@ static int fw_lookup_and_allocate_buf(const char *fw_name,
 		}
 	}
 	tmp = __allocate_fw_buf(fw_name, fwc, dbuf, size);
-	if (tmp && !(opt_flags & FW_OPT_NOCACHE))
-		list_add(&tmp->list, &fwc->head);
+	if (tmp) {
+		INIT_LIST_HEAD(&tmp->list);
+		if (!(opt_flags & FW_OPT_NOCACHE))
+			list_add(&tmp->list, &fwc->head);
+	}
 	spin_unlock(&fwc->lock);
 
 	*buf = tmp;
