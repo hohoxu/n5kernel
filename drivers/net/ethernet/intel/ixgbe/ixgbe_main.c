@@ -8063,27 +8063,6 @@ static int ixgbe_del_sanmac_netdev(struct net_device *dev)
 	return err;
 }
 
-#ifdef CONFIG_NET_POLL_CONTROLLER
-/*
- * Polling 'interrupt' - used by things like netconsole to send skbs
- * without having to re-enable interrupts. It's not called while
- * the interrupt routine is executing.
- */
-static void ixgbe_netpoll(struct net_device *netdev)
-{
-	struct ixgbe_adapter *adapter = netdev_priv(netdev);
-	int i;
-
-	/* if interface is down do nothing */
-	if (test_bit(__IXGBE_DOWN, &adapter->state))
-		return;
-
-	/* loop through and schedule all active queues */
-	for (i = 0; i < adapter->num_q_vectors; i++)
-		ixgbe_msix_clean_rings(0, adapter->q_vector[i]);
-}
-
-#endif
 static struct rtnl_link_stats64 *ixgbe_get_stats64(struct net_device *netdev,
 						   struct rtnl_link_stats64 *stats)
 {
@@ -9235,9 +9214,6 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 	.ndo_get_vf_config	= ixgbe_ndo_get_vf_config,
 	.ndo_get_stats64	= ixgbe_get_stats64,
 	.ndo_setup_tc		= __ixgbe_setup_tc,
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller	= ixgbe_netpoll,
-#endif
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	.ndo_busy_poll		= ixgbe_low_latency_recv,
 #endif
