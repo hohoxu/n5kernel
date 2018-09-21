@@ -3197,20 +3197,6 @@ static int mlx5e_xdp(struct net_device *dev, struct netdev_xdp *xdp)
 	}
 }
 
-#ifdef CONFIG_NET_POLL_CONTROLLER
-/* Fake "interrupt" called by netpoll (eg netconsole) to send skbs without
- * reenabling interrupts.
- */
-static void mlx5e_netpoll(struct net_device *dev)
-{
-	struct mlx5e_priv *priv = netdev_priv(dev);
-	int i;
-
-	for (i = 0; i < priv->params.num_channels; i++)
-		napi_schedule(&priv->channel[i]->napi);
-}
-#endif
-
 static const struct net_device_ops mlx5e_netdev_ops_basic = {
 	.ndo_open                = mlx5e_open,
 	.ndo_stop                = mlx5e_close,
@@ -3231,9 +3217,6 @@ static const struct net_device_ops mlx5e_netdev_ops_basic = {
 #endif
 	.ndo_tx_timeout          = mlx5e_tx_timeout,
 	.ndo_xdp		 = mlx5e_xdp,
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller     = mlx5e_netpoll,
-#endif
 };
 
 static const struct net_device_ops mlx5e_netdev_ops_sriov = {
