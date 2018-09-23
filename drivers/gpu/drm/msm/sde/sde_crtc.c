@@ -5075,9 +5075,6 @@ static void sde_crtc_install_properties(struct drm_crtc *crtc,
 		"idle_time", 0, 0, U64_MAX, 0,
 		CRTC_PROP_IDLE_TIMEOUT);
 
-
-	msm_property_install_range(&sde_crtc->property_info,"CRTC_CUST",
-		0x0, 0, INT_MAX, 0, CRTC_PROP_CUSTOM);
 	msm_property_install_range(&sde_crtc->property_info,
 		"enable_sui_enhancement", 0, 0, U64_MAX, 0,
 		CRTC_PROP_ENABLE_SUI_ENHANCEMENT);
