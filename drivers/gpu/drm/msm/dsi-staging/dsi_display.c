@@ -39,6 +39,7 @@
 #include <linux/pm_qos.h>
 #include <linux/cpufreq.h>
 #include <linux/pm_wakeup.h>
+#include "../sde/sde_trace.h"
 
 #define BIG_CPU_NUMBER 4
 #if defined(CONFIG_ARCH_SDM845)
@@ -176,6 +177,7 @@ int dsi_display_set_backlight(void *display, u32 bl_lvl)
 	mutex_lock(&panel->panel_lock);
 	if (!dsi_panel_initialized(panel)) {
 		panel->hbm_backlight = bl_lvl;
+		panel->bl_config.bl_level = bl_lvl;
 		printk(KERN_ERR"HBM_backight =%d\n",panel->hbm_backlight);
 		rc = -EINVAL;
 		goto error;
@@ -1122,14 +1124,14 @@ int dsi_display_set_power(struct drm_connector *connector,
 	int rc = 0;
 	struct msm_drm_notifier notifier_data;
 	int blank;
-	int aod_mode = 0;
 	if (!display || !display->panel) {
 		pr_err("invalid display/panel\n");
 		return -EINVAL;
 	}
-
+	printk("enter dsi_display_set_power mode = %d\n", power_mode);
 	switch (power_mode) {
 	case SDE_MODE_DPMS_LP1:
+		rc = dsi_panel_set_lp1(display->panel);
 		printk(KERN_ERR"SDE_MODE_DPMS_LP1\n");
 		if (strcmp(display->panel->name, "samsung s6e3fc2x01 cmd mode dsi panel") == 0){
 		display->panel->aod_mode=2;
@@ -1142,21 +1144,23 @@ int dsi_display_set_power(struct drm_connector *connector,
 		}
 		break;
 	case SDE_MODE_DPMS_LP2:
-		printk(KERN_ERR"SDE_MODE_DPMS_LP2\n");
 		rc = dsi_panel_set_lp2(display->panel);
 		break;
 	default:
-		printk(KERN_ERR"SDE_MODE_DPMS default\n");
 		rc = dsi_panel_set_nolp(display->panel);
 		if ((power_mode == SDE_MODE_DPMS_ON) && display->panel->aod_status){
-			aod_mode=0;
-		    printk(KERN_ERR"Turn off AOD MODE aod_mode = %d\n",aod_mode);
-		    dsi_panel_set_aod_mode(display->panel, aod_mode);
-		} else if ((power_mode == SDE_MODE_DPMS_OFF)
+			display->panel->aod_mode=0;
+		    printk(KERN_ERR"Turn off AOD MODE aod_mode start\n");
+			display->panel->aod_status=0;
+			display->panel->aod_curr_mode = 0;
+			SDE_ATRACE_BEGIN("DSI_CMD_SET_AOD_OFF");
+			rc = dsi_panel_tx_cmd_set_op(display->panel, DSI_CMD_SET_AOD_OFF);
+			SDE_ATRACE_END("DSI_CMD_SET_AOD_OFF");
+			 printk(KERN_ERR"Turn off AOD MODE aod_mode end\n");
+			} else if ((power_mode == SDE_MODE_DPMS_OFF)
 		        && display->panel->aod_status){
             display->panel->aod_status = 0;
-            display->panel->aod_curr_mode = 0;
-		}
+            display->panel->aod_curr_mode = 0;		}
 		break;
 	}
 	if (power_mode == SDE_MODE_DPMS_ON) {
@@ -7163,6 +7167,7 @@ int dsi_display_set_aod_mode(struct drm_connector *connector, int level)
 	panel = dsi_display->panel;
 	mutex_lock(&dsi_display->display_lock);
 	panel->aod_mode = level;
+	rc = dsi_panel_set_aod_mode(panel, level);
 	if (!dsi_panel_initialized(panel)) {
 		goto error;
 	}
