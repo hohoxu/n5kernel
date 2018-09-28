@@ -14,8 +14,6 @@ make O=${outdir} ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- -j4
 
 cd ${outdir}
 
-cp -v arch/arm64/boot/Image.gz ../bootdir/kernel/
-cp -v $(find . -name \*\.dtb) ../bootdir/dtbs/
-cd ../bootdir
-rm -f ../kernel_??????????????.zip
-zip -r ../kernel_$(date +%Y%m%d%H%M%S).zip *
+rm -rf ../bootdir/*
+cp -v arch/arm64/boot/Image ../bootdir/kernel
+cat $(find . -name \*\.dtb) > ../bootdir/dtb
