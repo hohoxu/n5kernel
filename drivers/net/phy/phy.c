@@ -611,7 +611,7 @@ out_unlock:
 	mutex_unlock(&phydev->lock);
 
 	if (trigger)
-		phy_trigger_machine(phydev, sync);
+		phy_trigger_machine(phydev);
 
 	return err;
 }
@@ -631,6 +631,13 @@ int phy_start_aneg(struct phy_device *phydev)
 }
 EXPORT_SYMBOL(phy_start_aneg);
 
+static void phy_queue_state_machine(struct phy_device *phydev,
+				    unsigned int secs)
+{
+	mod_delayed_work(system_power_efficient_wq, &phydev->state_queue,
+			 secs * HZ);
+}
+
 /**
  * phy_start_machine - start PHY state machine tracking
  * @phydev: the phy_device struct
@@ -643,26 +650,21 @@ EXPORT_SYMBOL(phy_start_aneg);
  */
 void phy_start_machine(struct phy_device *phydev)
 {
-	queue_delayed_work(system_power_efficient_wq, &phydev->state_queue, HZ);
+	phy_queue_state_machine(phydev, 1);
 }
 
 /**
  * phy_trigger_machine - trigger the state machine to run
  *
  * @phydev: the phy_device struct
- * @sync: indicate whether we should wait for the workqueue cancelation
  *
  * Description: There has been a change in state which requires that the
  *   state machine runs.
  */
 
-void phy_trigger_machine(struct phy_device *phydev, bool sync)
+void phy_trigger_machine(struct phy_device *phydev)
 {
-	if (sync)
-		cancel_delayed_work_sync(&phydev->state_queue);
-	else
-		cancel_delayed_work(&phydev->state_queue);
-	queue_delayed_work(system_power_efficient_wq, &phydev->state_queue, 0);
+	phy_queue_state_machine(phydev, 0);
 }
 
 /**
@@ -698,7 +700,7 @@ static void phy_error(struct phy_device *phydev)
 	phydev->state = PHY_HALTED;
 	mutex_unlock(&phydev->lock);
 
-	phy_trigger_machine(phydev, false);
+	phy_trigger_machine(phydev);
 }
 
 /**
@@ -860,7 +862,7 @@ void phy_change(struct work_struct *work)
 	}
 
 	/* reschedule state queue work to run as soon as possible */
-	phy_trigger_machine(phydev, true);
+	phy_trigger_machine(phydev);
 	return;
 
 ignore:
@@ -952,7 +954,7 @@ void phy_start(struct phy_device *phydev)
 	if (do_resume)
 		phy_resume(phydev);
 
-	phy_trigger_machine(phydev, true);
+	phy_trigger_machine(phydev);
 }
 EXPORT_SYMBOL(phy_start);
 
@@ -1170,8 +1172,7 @@ void phy_state_machine(struct work_struct *work)
 	 * called from phy_disconnect() synchronously.
 	 */
 	if (phydev->irq == PHY_POLL && old_state != PHY_HALTED)
-		queue_delayed_work(system_power_efficient_wq, &phydev->state_queue,
-				   PHY_STATE_TIME * HZ);
+		phy_queue_state_machine(phydev, PHY_STATE_TIME);
 }
 
 void phy_mac_interrupt(struct phy_device *phydev, int new_link)
