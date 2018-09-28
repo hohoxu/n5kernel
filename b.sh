@@ -14,6 +14,5 @@ make O=${outdir} ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- -j4
 
 cd ${outdir}
 
-rm -rf ../bootdir/*
 cp -v arch/arm64/boot/Image ../bootdir/kernel
 cat $(find . -name \*\.dtb) > ../bootdir/dtb
