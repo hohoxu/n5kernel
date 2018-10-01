@@ -1253,6 +1253,9 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
 	void __iomem *reg;
 	bool use_tlbiall = smmu->options & ARM_SMMU_OPT_NO_ASID_RETENTION;
 
+	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+		wmb();
+
 	if (stage1 && !use_tlbiall) {
 		reg = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
 		reg += leaf ? ARM_SMMU_CB_S1_TLBIVAL : ARM_SMMU_CB_S1_TLBIVA;
