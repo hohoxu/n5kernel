@@ -53,7 +53,6 @@ struct trace_uprobe {
 	struct list_head		list;
 	struct trace_uprobe_filter	filter;
 	struct uprobe_consumer		consumer;
-	struct path			path;
 	struct inode			*inode;
 	char				*filename;
 	unsigned long			offset;
@@ -288,7 +287,7 @@ static void free_trace_uprobe(struct trace_uprobe *tu)
 	for (i = 0; i < tu->tp.nr_args; i++)
 		traceprobe_free_probe_arg(&tu->tp.args[i]);
 
-	path_put(&tu->path);
+	iput(tu->inode);
 	kfree(tu->tp.call.class->system);
 	kfree(tu->tp.call.name);
 	kfree(tu->filename);
@@ -362,6 +361,7 @@ end:
 static int create_trace_uprobe(int argc, char **argv)
 {
 	struct trace_uprobe *tu;
+	struct inode *inode;
 	char *arg, *event, *group, *filename;
 	char buf[MAX_EVENT_NAME_LEN];
 	struct path path;
@@ -369,6 +369,7 @@ static int create_trace_uprobe(int argc, char **argv)
 	bool is_delete, is_return;
 	int i, ret;
 
+	inode = NULL;
 	ret = 0;
 	is_delete = false;
 	is_return = false;
@@ -433,16 +434,21 @@ static int create_trace_uprobe(int argc, char **argv)
 		return -EINVAL;
 	}
 	arg = strchr(argv[1], ':');
-	if (!arg)
-		return -EINVAL;
+	if (!arg) {
+		ret = -EINVAL;
+		goto fail_address_parse;
+	}
 
 	*arg++ = '\0';
 	filename = argv[1];
 	ret = kern_path(filename, LOOKUP_FOLLOW, &path);
 	if (ret)
-		return ret;
+		goto fail_address_parse;
 
-	if (!S_ISREG(d_inode(path.dentry)->i_mode)) {
+	inode = igrab(d_inode(path.dentry));
+	path_put(&path);
+
+	if (!inode || !S_ISREG(inode->i_mode)) {
 		ret = -EINVAL;
 		goto fail_address_parse;
 	}
@@ -481,7 +487,7 @@ static int create_trace_uprobe(int argc, char **argv)
 		goto fail_address_parse;
 	}
 	tu->offset = offset;
-	tu->path = path;
+	tu->inode = inode;
 	tu->filename = kstrdup(filename, GFP_KERNEL);
 
 	if (!tu->filename) {
@@ -549,7 +555,7 @@ error:
 	return ret;
 
 fail_address_parse:
-	path_put(&path);
+	iput(inode);
 
 	pr_info("Failed to parse address or file.\n");
 
@@ -928,7 +934,6 @@ probe_event_enable(struct trace_uprobe *tu, struct trace_event_file *file,
 		goto err_flags;
 
 	tu->consumer.filter = filter;
-	tu->inode = d_real_inode(tu->path.dentry);
 	ret = uprobe_register(tu->inode, tu->offset, &tu->consumer);
 	if (ret)
 		goto err_buffer;
@@ -974,7 +979,6 @@ probe_event_disable(struct trace_uprobe *tu, struct trace_event_file *file)
 	WARN_ON(!uprobe_filter_is_empty(&tu->filter));
 
 	uprobe_unregister(tu->inode, tu->offset, &tu->consumer);
-	tu->inode = NULL;
 	tu->tp.flags &= file ? ~TP_FLAG_TRACE : ~TP_FLAG_PROFILE;
 
 	uprobe_buffer_disable();
