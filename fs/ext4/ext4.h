@@ -1407,8 +1407,7 @@ struct ext4_sb_info {
 	u32 s_min_batch_time;
 	struct block_device *journal_bdev;
 #ifdef CONFIG_QUOTA
-	/* Names of quota files with journalled quota */
-	char __rcu *s_qf_names[EXT4_MAXQUOTAS];
+	char *s_qf_names[EXT4_MAXQUOTAS];	/* Names of quota files with journalled quota */
 	int s_jquota_fmt;			/* Format of quota to use */
 #endif
 	unsigned int s_want_extra_isize; /* New inodes should reserve # bytes */
