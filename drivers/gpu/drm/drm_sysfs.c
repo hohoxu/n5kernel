@@ -22,25 +22,6 @@
 #include <drm/drmP.h>
 #include "drm_internal.h"
 
-
-
-
-
-#include <linux/list.h>
-#include <linux/of.h>
-#include <linux/kobject.h>
-#include <linux/string.h>
-#include <linux/module.h>
-#include <linux/init.h>
-#include <drm/drm_mipi_dsi.h>
-
-
-
-
-
-
-
-
 #define to_drm_minor(d) dev_get_drvdata(d)
 #define to_drm_connector(d) dev_get_drvdata(d)
 
@@ -643,7 +624,6 @@ static ssize_t panel_mismatch_show(struct device *dev,
 											wrong_panel);
 	return ret;
 }
-
 
 static DEVICE_ATTR_RW(status);
 static DEVICE_ATTR_RO(enabled);
