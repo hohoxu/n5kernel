@@ -2457,11 +2457,6 @@ static int cam_icp_mgr_abort_handle(
 		rc = -ETIMEDOUT;
 		CAM_ERR(CAM_ICP, "FW timeout/err in abort handle command");
 	}
-	else{
-		//workq won't do free,if no timeout means
-		//cmd execution finished,so just release it.
-		kfree(abort_cmd);
-	}
 
 	return rc;
 }
@@ -2515,11 +2510,6 @@ static int cam_icp_mgr_destroy_handle(
 		if (icp_hw_mgr.a5_debug_type ==
 			HFI_DEBUG_MODE_QUEUE)
 			cam_icp_mgr_process_dbg_buf();
-	}
-	else{
-		//workq won't do free,if no timeout means
-		//cmd execution finished,so just release it.
-		kfree(destroy_cmd);
 	}
 
 	return rc;
