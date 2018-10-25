@@ -13,7 +13,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
-
+#include <linux/ratelimit.h>
 #include "cam_io_util.h"
 #include "cam_irq_controller.h"
 #include "cam_debug_util.h"
@@ -615,7 +615,7 @@ static void cam_irq_controller_th_processing(
 			rc = irq_bh_api->get_bh_payload_func(
 				evt_handler->bottom_half, &bh_cmd);
 			if (rc || !bh_cmd) {
-				CAM_ERR(CAM_ISP, "Can't get bh payload");
+                		CAM_ERR_RATE_LIMIT(CAM_ISP, "Can't get bh payload");
 				continue;
 			}
 		}
