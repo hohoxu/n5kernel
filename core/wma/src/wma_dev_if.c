@@ -3337,7 +3337,8 @@ void wma_vdev_resp_timer(void *data)
 		if (wma_crash_on_fw_timeout(wma->fw_timeout_crash) == true) {
 			wma_trigger_recovery_assert_on_fw_timeout(
 				WMA_DELETE_BSS_REQ);
-			return;
+			wma_cleanup_target_req_param(tgt_req);
+			goto free_tgt_req;
 		}
 
 		if (wma_is_vdev_in_ibss_mode(wma, tgt_req->vdev_id))
@@ -5359,7 +5360,6 @@ fail_del_bss_ho_fail:
 		WMA_DELETE_BSS_HO_FAIL_RSP, (void *)params, 0);
 }
 
-#ifdef WLAN_FEATURE_HOST_ROAM
 /**
  * wma_wait_tx_complete() - Wait till tx packets are drained
  * @wma: wma handle
@@ -5396,12 +5396,7 @@ static void wma_wait_tx_complete(tp_wma_handle wma,
 		max_wait_iterations--;
 	}
 }
-#else
-static void wma_wait_tx_complete(tp_wma_handle wma)
-{
 
-}
-#endif
 /**
  * wma_delete_bss() - process delete bss request from upper layer
  * @wma: wma handle
