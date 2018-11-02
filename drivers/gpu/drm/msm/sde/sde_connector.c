@@ -547,6 +547,7 @@ static int _sde_connector_update_bl_scale(struct sde_connector *c_conn)
 	if (dsi_display->panel->bl_config.bl_update ==
 		BL_UPDATE_DELAY_UNTIL_FIRST_FRAME && !c_conn->allow_bl_update) {
 		c_conn->unset_bl_level = bl_config->bl_level;
+		mutex_unlock(&bd->update_lock);
 		return 0;
 	}
 
