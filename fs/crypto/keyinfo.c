@@ -65,11 +65,6 @@ out:
 	return res;
 }
 
-<<<<<<< HEAD
-static int validate_user_key(struct fscrypt_info *crypt_info,
-			struct fscrypt_context *ctx,
-			const char *prefix, int min_keysize)
-=======
 /*
  * Search the current task's subscribed keyrings for a "logon" key with
  * description prefix:descriptor, and if found acquire a read lock on it and
@@ -80,7 +75,6 @@ find_and_lock_process_key(const char *prefix,
 			  const u8 descriptor[FS_KEY_DESCRIPTOR_SIZE],
 			  unsigned int min_keysize,
 			  const struct fscrypt_key **payload_ret)
->>>>>>> 24cc7a8cbbac... fscrypt: separate key lookup from key derivation
 {
 	char *description;
 	struct key *key;
@@ -146,37 +140,16 @@ static int find_and_derive_key(const struct inode *inode,
 						ctx->master_key_descriptor,
 						derived_keysize, &payload);
 	}
-<<<<<<< HEAD
-	res = derive_key_aes(ctx->nonce, master_key, crypt_info->ci_raw_key);
-	/* If we don't need to derive, we still want to do everything
-	 * up until now to validate the key. It's cleaner to fail now
-	 * than to fail in block I/O.
-	if (!is_private_data_mode(crypt_info)) {
-		res = derive_key_aes(ctx->nonce, master_key,
-				crypt_info->ci_raw_key);
-	} else {
-		 * Inline encryption: no key derivation required because IVs are
-		 * assigned based on iv_sector.
-
-		BUILD_BUG_ON(sizeof(crypt_info->ci_raw_key) !=
-				sizeof(master_key->raw));
-		memcpy(crypt_info->ci_raw_key,
-			master_key->raw, sizeof(crypt_info->ci_raw_key));
-		res = 0;
-	}
-	 */
-out:
-	up_read(&keyring_key->sem);
-	key_put(keyring_key);
-	return res;
-=======
 	if (IS_ERR(key))
 		return PTR_ERR(key);
 	err = derive_key_aes(payload->raw, ctx, derived_key, derived_keysize);
+        /* If we don't need to derive, we still want to do everything
+         * up until now to validate the key. It's cleaner to fail now
+         * than to fail in block I/O.
+	 */
 	up_read(&key->sem);
 	key_put(key);
 	return err;
->>>>>>> 24cc7a8cbbac... fscrypt: separate key lookup from key derivation
 }
 
 static struct fscrypt_mode {
@@ -185,19 +158,6 @@ static struct fscrypt_mode {
 	int keysize;
 	bool logged_impl_name;
 } available_modes[] = {
-<<<<<<< HEAD
-	[FS_ENCRYPTION_MODE_AES_256_XTS]      = { "xts(aes)",		64 },
-	[FS_ENCRYPTION_MODE_AES_256_CTS]      = { "cts(cbc(aes))",	32 },
-	[FS_ENCRYPTION_MODE_AES_128_CBC]      = { "cbc(aes)",		16 },
-	[FS_ENCRYPTION_MODE_AES_128_CTS]      = { "cts(cbc(aes))",	16 },
-	[FS_ENCRYPTION_MODE_SPECK128_256_XTS] = { "xts(speck128)",	64 },
-	[FS_ENCRYPTION_MODE_SPECK128_256_CTS] = { "cts(cbc(speck128))",	32 },
-	[FS_ENCRYPTION_MODE_PRIVATE]	      = { "bugon",		64 },
-};
-
-static int determine_cipher_type(struct fscrypt_info *ci, struct inode *inode,
-		const char **cipher_str_ret, int *keysize_ret, int *fname)
-=======
 	[FS_ENCRYPTION_MODE_AES_256_XTS] = {
 		.friendly_name = "AES-256-XTS",
 		.cipher_str = "xts(aes)",
@@ -228,11 +188,15 @@ static int determine_cipher_type(struct fscrypt_info *ci, struct inode *inode,
 		.cipher_str = "cts(cbc(speck128))",
 		.keysize = 32,
 	},
+	[FS_ENCRYPTION_MODE_PRIVATE] = {
+		.friendly_name = "ICE",
+		.cipher_str = "bugon",
+		.keysize = 64,
+	},
 };
 
 static struct fscrypt_mode *
 select_encryption_mode(const struct fscrypt_info *ci, const struct inode *inode)
->>>>>>> a4842a18697e... fscrypt: log the crypto algorithm implementations
 {
 	if (!fscrypt_valid_enc_modes(ci->ci_data_mode, ci->ci_filename_mode)) {
 		fscrypt_warn(inode->i_sb,
@@ -242,26 +206,11 @@ select_encryption_mode(const struct fscrypt_info *ci, const struct inode *inode)
 		return ERR_PTR(-EINVAL);
 	}
 
-<<<<<<< HEAD
-	if (S_ISREG(inode->i_mode)) {
-		ci->ci_mode = CI_DATA_MODE;
-		mode = ci->ci_data_mode;
-	} else if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode)) {
-		ci->ci_mode = CI_FNAME_MODE;
-		mode = ci->ci_filename_mode;
-		*fname = 1;
-	} else {
-		WARN_ONCE(1, "fscrypt: filesystem tried to load encryption info for inode %lu, which is not encryptable (file type %d)\n",
-			  inode->i_ino, (inode->i_mode & S_IFMT));
-		return -EINVAL;
-	}
-=======
 	if (S_ISREG(inode->i_mode))
 		return &available_modes[ci->ci_data_mode];
 
 	if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))
 		return &available_modes[ci->ci_filename_mode];
->>>>>>> a4842a18697e... fscrypt: log the crypto algorithm implementations
 
 	WARN_ONCE(1, "fscrypt: filesystem tried to load encryption info for inode %lu, which is not encryptable (file type %d)\n",
 		  inode->i_ino, (inode->i_mode & S_IFMT));
@@ -352,20 +301,20 @@ static int fscrypt_data_encryption_mode(struct inode *inode)
 	FS_ENCRYPTION_MODE_PRIVATE : FS_ENCRYPTION_MODE_AES_256_XTS;
 }
 
+int fscrypt_get_mode_key_size(int mode)
+{
+	return available_modes[mode].keysize;
+}
+EXPORT_SYMBOL(fscrypt_get_mode_key_size);
+
 int fscrypt_get_encryption_info(struct inode *inode)
 {
 	struct fscrypt_info *crypt_info;
 	struct fscrypt_context ctx;
 	struct crypto_skcipher *ctfm;
-<<<<<<< HEAD
-	const char *cipher_str;
-	int keysize;
-=======
 	struct fscrypt_mode *mode;
 	u8 *raw_key = NULL;
->>>>>>> a4842a18697e... fscrypt: log the crypto algorithm implementations
 	int res;
-	int fname = 0;
 
 	if (inode->i_crypt_info)
 		return 0;
@@ -408,15 +357,9 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	memcpy(crypt_info->ci_master_key, ctx.master_key_descriptor,
 				sizeof(crypt_info->ci_master_key));
 
-<<<<<<< HEAD
-	res = determine_cipher_type(crypt_info, inode, &cipher_str, &keysize,
-				&fname);
-	if (res)
-=======
 	mode = select_encryption_mode(crypt_info, inode);
 	if (IS_ERR(mode)) {
 		res = PTR_ERR(mode);
->>>>>>> a4842a18697e... fscrypt: log the crypto algorithm implementations
 		goto out;
 	}
 
@@ -425,53 +368,25 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	 * crypto API as part of key derivation.
 	 */
 	res = -ENOMEM;
-<<<<<<< HEAD
-<<<<<<< HEAD
-
-<<<<<<< HEAD
-	res = validate_user_key(crypt_info, &ctx, FS_KEY_DESC_PREFIX,
-				keysize);
-	if (res && inode->i_sb->s_cop->key_prefix) {
-		int res2 = validate_user_key(crypt_info, &ctx,
-					     inode->i_sb->s_cop->key_prefix,
-					     keysize);
-		if (res2) {
-			if (res2 == -ENOKEY)
-				res = -ENOKEY;
-			goto out;
-		}
-		res = 0;
-	} else if (res) {
-=======
-	raw_key = kmalloc(keysize, GFP_NOFS);
-=======
 	raw_key = kmalloc(mode->keysize, GFP_NOFS);
->>>>>>> a4842a18697e... fscrypt: log the crypto algorithm implementations
 	if (!raw_key)
->>>>>>> 08ac7224b566... fscrypt: only derive the needed portion of the key
 		goto out;
-	}
+
+	res = find_and_derive_key(inode, &ctx, raw_key, mode->keysize);
+	if (res)
+		goto out;
 
 	if (is_private_data_mode(crypt_info)) {
 		if (!fscrypt_is_ice_capable(inode->i_sb)) {
 			pr_warn("%s: ICE support not available\n",
-					__func__);
+				__func__);
 			res = -EINVAL;
 			goto out;
 		}
 		/* Let's encrypt/decrypt by ICE */
+		memcpy(crypt_info->ci_raw_key, raw_key, mode->keysize);
 		goto do_ice;
 	}
-
-<<<<<<< HEAD
-=======
-	res = find_and_derive_key(inode, &ctx, raw_key, keysize);
-=======
-	res = find_and_derive_key(inode, &ctx, raw_key, mode->keysize);
->>>>>>> a4842a18697e... fscrypt: log the crypto algorithm implementations
-	if (res)
-		goto out;
->>>>>>> 24cc7a8cbbac... fscrypt: separate key lookup from key derivation
 
 	ctfm = crypto_alloc_skcipher(mode->cipher_str, 0, 0);
 	if (IS_ERR(ctfm)) {
@@ -496,30 +411,13 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	}
 	crypt_info->ci_ctfm = ctfm;
 	crypto_skcipher_set_flags(ctfm, CRYPTO_TFM_REQ_WEAK_KEY);
-<<<<<<< HEAD
-<<<<<<< HEAD
-	/*
-	 * if the provided key is longer than keysize, we use the first
-	 * keysize bytes of the derived key only
-	 */
-	res = crypto_skcipher_setkey(ctfm, crypt_info->ci_raw_key, keysize);
-=======
-	res = crypto_skcipher_setkey(ctfm, raw_key, keysize);
->>>>>>> 08ac7224b566... fscrypt: only derive the needed portion of the key
-=======
 	res = crypto_skcipher_setkey(ctfm, raw_key, mode->keysize);
->>>>>>> a4842a18697e... fscrypt: log the crypto algorithm implementations
 	if (res)
 		goto out;
 
 	if (S_ISREG(inode->i_mode) &&
 	    crypt_info->ci_data_mode == FS_ENCRYPTION_MODE_AES_128_CBC) {
-<<<<<<< HEAD
-		res = init_essiv_generator(crypt_info, crypt_info->ci_raw_key,
-						keysize);
-=======
 		res = init_essiv_generator(crypt_info, raw_key, mode->keysize);
->>>>>>> a4842a18697e... fscrypt: log the crypto algorithm implementations
 		if (res) {
 			fscrypt_warn(inode->i_sb,
 				     "error initializing ESSIV generator for inode %lu: %d",
