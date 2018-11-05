@@ -1721,10 +1721,8 @@ static int f2fs_ioc_commit_atomic_write(struct file *filp)
 
 	down_write(&F2FS_I(inode)->dio_rwsem[WRITE]);
 
-	if (f2fs_is_volatile_file(inode)) {
-		ret = -EINVAL;
+	if (f2fs_is_volatile_file(inode))
 		goto err_out;
-	}
 
 	if (f2fs_is_atomic_file(inode)) {
 		ret = commit_inmem_pages(inode);
