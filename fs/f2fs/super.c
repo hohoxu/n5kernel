@@ -58,21 +58,17 @@ char *f2fs_fault_name[FAULT_MAX] = {
 	[FAULT_DISCARD]		= "discard error",
 };
 
-void f2fs_build_fault_attr(struct f2fs_sb_info *sbi, unsigned int rate,
-							unsigned int type)
+void f2fs_build_fault_attr(struct f2fs_sb_info *sbi, unsigned int rate)
 {
 	struct f2fs_fault_info *ffi = &F2FS_OPTION(sbi).fault_info;
 
 	if (rate) {
 		atomic_set(&ffi->inject_ops, 0);
 		ffi->inject_rate = rate;
-	}
-
-	if (type)
-		ffi->inject_type = type;
-
-	if (!rate && !type)
+		ffi->inject_type = (1 << FAULT_MAX) - 1;
+	} else {
 		memset(ffi, 0, sizeof(struct f2fs_fault_info));
+	}
 }
 #endif
 
@@ -117,7 +113,6 @@ enum {
 	Opt_mode,
 	Opt_io_size_bits,
 	Opt_fault_injection,
-	Opt_fault_type,
 	Opt_lazytime,
 	Opt_nolazytime,
 	Opt_quota,
@@ -175,7 +170,6 @@ static match_table_t f2fs_tokens = {
 	{Opt_mode, "mode=%s"},
 	{Opt_io_size_bits, "io_bits=%u"},
 	{Opt_fault_injection, "fault_injection=%u"},
-	{Opt_fault_type, "fault_type=%u"},
 	{Opt_lazytime, "lazytime"},
 	{Opt_nolazytime, "nolazytime"},
 	{Opt_quota, "quota"},
@@ -606,18 +600,7 @@ static int parse_options(struct super_block *sb, char *options)
 			if (args->from && match_int(args, &arg))
 				return -EINVAL;
 #ifdef CONFIG_F2FS_FAULT_INJECTION
-			f2fs_build_fault_attr(sbi, arg, F2FS_ALL_FAULT_TYPE);
-			set_opt(sbi, FAULT_INJECTION);
-#else
-			f2fs_msg(sb, KERN_INFO,
-				"FAULT_INJECTION was not selected");
-#endif
-			break;
-		case Opt_fault_type:
-			if (args->from && match_int(args, &arg))
-				return -EINVAL;
-#ifdef CONFIG_F2FS_FAULT_INJECTION
-			f2fs_build_fault_attr(sbi, 0, arg);
+			f2fs_build_fault_attr(sbi, arg);
 			set_opt(sbi, FAULT_INJECTION);
 #else
 			f2fs_msg(sb, KERN_INFO,
@@ -1338,12 +1321,9 @@ static int f2fs_show_options(struct seq_file *seq, struct dentry *root)
 	if (F2FS_IO_SIZE_BITS(sbi))
 		seq_printf(seq, ",io_size=%uKB", F2FS_IO_SIZE_KB(sbi));
 #ifdef CONFIG_F2FS_FAULT_INJECTION
-	if (test_opt(sbi, FAULT_INJECTION)) {
+	if (test_opt(sbi, FAULT_INJECTION))
 		seq_printf(seq, ",fault_injection=%u",
 				F2FS_OPTION(sbi).fault_info.inject_rate);
-		seq_printf(seq, ",fault_type=%u",
-				F2FS_OPTION(sbi).fault_info.inject_type);
-	}
 #endif
 #ifdef CONFIG_QUOTA
 	if (test_opt(sbi, QUOTA))
@@ -1413,7 +1393,7 @@ static void default_options(struct f2fs_sb_info *sbi)
 	set_opt(sbi, POSIX_ACL);
 #endif
 
-	f2fs_build_fault_attr(sbi, 0, 0);
+	f2fs_build_fault_attr(sbi, 0);
 }
 
 #ifdef CONFIG_QUOTA
