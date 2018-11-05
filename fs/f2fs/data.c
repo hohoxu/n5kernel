@@ -2357,9 +2357,8 @@ static int f2fs_write_begin(struct file *file, struct address_space *mapping,
 	}
 	trace_f2fs_write_begin(inode, pos, len, flags);
 
-	if ((f2fs_is_atomic_file(inode) &&
-			!f2fs_available_free_memory(sbi, INMEM_PAGES)) ||
-			is_inode_flag_set(inode, FI_ATOMIC_REVOKE_REQUEST)) {
+	if (f2fs_is_atomic_file(inode) &&
+			!f2fs_available_free_memory(sbi, INMEM_PAGES)) {
 		err = -ENOMEM;
 		drop_atomic = true;
 		goto fail;
