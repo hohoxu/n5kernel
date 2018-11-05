@@ -100,10 +100,8 @@ repeat:
 	 * readonly and make sure do not write checkpoint with non-uptodate
 	 * meta page.
 	 */
-	if (unlikely(!PageUptodate(page))) {
-		memset(page_address(page), 0, PAGE_SIZE);
+	if (unlikely(!PageUptodate(page)))
 		f2fs_stop_checkpoint(sbi, false);
-	}
 out:
 	return page;
 }
