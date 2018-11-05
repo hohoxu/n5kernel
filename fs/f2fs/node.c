@@ -2350,9 +2350,8 @@ retry:
 	spin_unlock(&nm_i->nid_list_lock);
 
 	/* Let's scan nat pages and its caches to get free nids */
-	if (!f2fs_build_free_nids(sbi, true, false))
-		goto retry;
-	return false;
+	f2fs_build_free_nids(sbi, true, false);
+	goto retry;
 }
 
 /*
