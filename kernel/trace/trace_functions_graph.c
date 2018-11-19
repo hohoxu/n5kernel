@@ -123,7 +123,7 @@ print_graph_duration(struct trace_array *tr, unsigned long long duration,
 
 /* Add a function return address to the trace stack on thread info.*/
 static int
-ftrace_push_return_trace(unsigned long ret, unsigned long func, int *depth,
+ftrace_push_return_trace(unsigned long ret, unsigned long func,
 			 unsigned long frame_pointer, unsigned long *retp)
 {
 	unsigned long long calltime;
@@ -181,8 +181,6 @@ ftrace_push_return_trace(unsigned long ret, unsigned long func, int *depth,
 #ifdef HAVE_FUNCTION_GRAPH_RET_ADDR_PTR
 	current->ret_stack[index].retp = retp;
 #endif
-	*depth = current->curr_ret_stack;
-
 	return 0;
 }
 
@@ -192,14 +190,20 @@ int function_graph_enter(unsigned long ret, unsigned long func,
 	struct ftrace_graph_ent trace;
 
 	trace.func = func;
-	trace.depth = current->curr_ret_stack + 1;
+	trace.depth = ++current->curr_ret_depth;
 
 	/* Only trace if the calling function expects to */
 	if (!ftrace_graph_entry(&trace))
-		return -EBUSY;
+		goto out;
 
-	return ftrace_push_return_trace(ret, func, &trace.depth,
-					frame_pointer, retp);
+	if (ftrace_push_return_trace(ret, func,
+				     frame_pointer, retp))
+		goto out;
+
+	return 0;
+ out:
+	current->curr_ret_depth--;
+	return -EBUSY;
 }
 
 /* Retrieve a function return address to the trace stack on thread info.*/
@@ -261,7 +265,7 @@ ftrace_pop_return_trace(struct ftrace_graph_ret *trace, unsigned long *ret,
 	trace->func = current->ret_stack[index].func;
 	trace->calltime = current->ret_stack[index].calltime;
 	trace->overrun = atomic_read(&current->trace_overrun);
-	trace->depth = index;
+	trace->depth = current->curr_ret_depth;
 }
 
 /*
@@ -277,6 +281,7 @@ unsigned long ftrace_return_to_handler(unsigned long frame_pointer)
 	trace.rettime = trace_clock_local();
 	barrier();
 	current->curr_ret_stack--;
+	current->curr_ret_depth--;
 	/*
 	 * The curr_ret_stack can be less than -1 only if it was
 	 * filtered out and it's about to return from the function.
