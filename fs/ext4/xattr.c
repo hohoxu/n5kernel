@@ -316,14 +316,13 @@ ext4_xattr_block_get(struct inode *inode, int name_index, const char *name,
 	ea_idebug(inode, "name=%d.%s, buffer=%p, buffer_size=%ld",
 		  name_index, name, buffer, (long)buffer_size);
 
-	error = -ENODATA;
 	if (!EXT4_I(inode)->i_file_acl)
-		goto cleanup;
+		return -ENODATA;
 	ea_idebug(inode, "reading block %llu",
 		  (unsigned long long)EXT4_I(inode)->i_file_acl);
-	bh = sb_bread(inode->i_sb, EXT4_I(inode)->i_file_acl);
-	if (!bh)
-		goto cleanup;
+	bh = ext4_sb_bread(inode->i_sb, EXT4_I(inode)->i_file_acl, REQ_PRIO);
+	if (IS_ERR(bh))
+		return PTR_ERR(bh);
 	ea_bdebug(bh, "b_count=%d, refcount=%d",
 		atomic_read(&(bh->b_count)), le32_to_cpu(BHDR(bh)->h_refcount));
 	if (ext4_xattr_check_block(inode, bh)) {
@@ -482,15 +481,13 @@ ext4_xattr_block_list(struct dentry *dentry, char *buffer, size_t buffer_size)
 	ea_idebug(inode, "buffer=%p, buffer_size=%ld",
 		  buffer, (long)buffer_size);
 
-	error = 0;
 	if (!EXT4_I(inode)->i_file_acl)
-		goto cleanup;
+		return 0;
 	ea_idebug(inode, "reading block %llu",
 		  (unsigned long long)EXT4_I(inode)->i_file_acl);
-	bh = sb_bread(inode->i_sb, EXT4_I(inode)->i_file_acl);
-	error = -EIO;
-	if (!bh)
-		goto cleanup;
+	bh = ext4_sb_bread(inode->i_sb, EXT4_I(inode)->i_file_acl, REQ_PRIO);
+	if (IS_ERR(bh))
+		return PTR_ERR(bh);
 	ea_bdebug(bh, "b_count=%d, refcount=%d",
 		atomic_read(&(bh->b_count)), le32_to_cpu(BHDR(bh)->h_refcount));
 	if (ext4_xattr_check_block(inode, bh)) {
@@ -500,11 +497,10 @@ ext4_xattr_block_list(struct dentry *dentry, char *buffer, size_t buffer_size)
 		goto cleanup;
 	}
 	ext4_xattr_cache_insert(ext4_mb_cache, bh);
-	error = ext4_xattr_list_entries(dentry, BFIRST(bh), buffer, buffer_size);
-
+	error = ext4_xattr_list_entries(dentry, BFIRST(bh), buffer,
+					buffer_size);
 cleanup:
 	brelse(bh);
-
 	return error;
 }
 
@@ -810,18 +806,16 @@ ext4_xattr_block_find(struct inode *inode, struct ext4_xattr_info *i,
 
 	if (EXT4_I(inode)->i_file_acl) {
 		/* The inode already has an extended attribute block. */
-		bs->bh = sb_bread(sb, EXT4_I(inode)->i_file_acl);
-		error = -EIO;
-		if (!bs->bh)
-			goto cleanup;
+		bs->bh = ext4_sb_bread(sb, EXT4_I(inode)->i_file_acl, REQ_PRIO);
+		if (IS_ERR(bs->bh))
+			return PTR_ERR(bs->bh);
 		ea_bdebug(bs->bh, "b_count=%d, refcount=%d",
 			atomic_read(&(bs->bh->b_count)),
 			le32_to_cpu(BHDR(bs->bh)->h_refcount));
 		if (ext4_xattr_check_block(inode, bs->bh)) {
 			EXT4_ERROR_INODE(inode, "bad block %llu",
 					 EXT4_I(inode)->i_file_acl);
-			error = -EFSCORRUPTED;
-			goto cleanup;
+			return -EFSCORRUPTED;
 		}
 		/* Find the named attribute. */
 		bs->s.base = BHDR(bs->bh);
@@ -832,13 +826,10 @@ ext4_xattr_block_find(struct inode *inode, struct ext4_xattr_info *i,
 					 i->name_index, i->name,
 					 bs->bh->b_size, 1);
 		if (error && error != -ENODATA)
-			goto cleanup;
+			return error;
 		bs->s.not_found = error;
 	}
-	error = 0;
-
-cleanup:
-	return error;
+	return 0;
 }
 
 static int
@@ -1549,10 +1540,12 @@ retry:
 	 * EA block can hold new_extra_isize bytes.
 	 */
 	if (EXT4_I(inode)->i_file_acl) {
-		bh = sb_bread(inode->i_sb, EXT4_I(inode)->i_file_acl);
-		error = -EIO;
-		if (!bh)
+		bh = ext4_sb_bread(inode->i_sb, EXT4_I(inode)->i_file_acl, REQ_PRIO);
+		if (IS_ERR(bh)) {
+			error = PTR_ERR(bh);
+			bh = NULL;
 			goto cleanup;
+		}
 		if (ext4_xattr_check_block(inode, bh)) {
 			EXT4_ERROR_INODE(inode, "bad block %llu",
 					 EXT4_I(inode)->i_file_acl);
@@ -1629,10 +1622,11 @@ ext4_xattr_delete_inode(handle_t *handle, struct inode *inode)
 
 	if (!EXT4_I(inode)->i_file_acl)
 		goto cleanup;
-	bh = sb_bread(inode->i_sb, EXT4_I(inode)->i_file_acl);
-	if (!bh) {
+	bh = ext4_sb_bread(inode->i_sb, EXT4_I(inode)->i_file_acl, REQ_PRIO);
+	if (IS_ERR(bh)) {
 		EXT4_ERROR_INODE(inode, "block %llu read error",
 				 EXT4_I(inode)->i_file_acl);
+		bh = NULL;
 		goto cleanup;
 	}
 	if (BHDR(bh)->h_magic != cpu_to_le32(EXT4_XATTR_MAGIC) ||
@@ -1737,10 +1731,13 @@ ext4_xattr_cache_find(struct inode *inode, struct ext4_xattr_header *header,
 	while (ce) {
 		struct buffer_head *bh;
 
-		bh = sb_bread(inode->i_sb, ce->e_block);
-		if (!bh) {
+		bh = ext4_sb_bread(inode->i_sb, ce->e_block, REQ_PRIO);
+		if (IS_ERR(bh)) {
+			if (PTR_ERR(bh) == -ENOMEM)
+				return NULL;
 			EXT4_ERROR_INODE(inode, "block %lu read error",
 					 (unsigned long) ce->e_block);
+			bh = NULL;
 		} else if (ext4_xattr_cmp(header, BHDR(bh)) == 0) {
 			*pce = ce;
 			return bh;
