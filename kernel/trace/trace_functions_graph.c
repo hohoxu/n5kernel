@@ -417,7 +417,8 @@ int trace_graph_entry(struct ftrace_graph_ent *trace)
 		return 0;
 
 	/* trace it when it is-nested-in or is a function enabled. */
-	if ((!(trace->depth || ftrace_graph_addr(trace->func)) ||
+	if ((!(trace_recursion_test(TRACE_GRAPH_BIT) ||
+	     ftrace_graph_addr(trace)) ||
 	     ftrace_graph_ignore_irqs()) || (trace->depth < 0) ||
 	    (max_depth && trace->depth >= max_depth))
 		return 0;
@@ -513,6 +514,8 @@ void trace_graph_return(struct ftrace_graph_ret *trace)
 	int cpu;
 	int pc;
 
+	ftrace_graph_addr_finish(trace);
+
 	local_irq_save(flags);
 	cpu = raw_smp_processor_id();
 	data = per_cpu_ptr(tr->trace_buffer.data, cpu);
@@ -536,6 +539,8 @@ void set_graph_array(struct trace_array *tr)
 
 static void trace_graph_thresh_return(struct ftrace_graph_ret *trace)
 {
+	ftrace_graph_addr_finish(trace);
+
 	if (tracing_thresh &&
 	    (trace->rettime - trace->calltime < tracing_thresh))
 		return;

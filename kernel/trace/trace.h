@@ -491,11 +491,43 @@ enum {
  * can only be modified by current, we can reuse trace_recursion.
  */
 	TRACE_IRQ_BIT,
+
+	/* Set if the function is in the set_graph_function file */
+	TRACE_GRAPH_BIT,
+
+	/*
+	 * In the very unlikely case that an interrupt came in
+	 * at a start of graph tracing, and we want to trace
+	 * the function in that interrupt, the depth can be greater
+	 * than zero, because of the preempted start of a previous
+	 * trace. In an even more unlikely case, depth could be 2
+	 * if a softirq interrupted the start of graph tracing,
+	 * followed by an interrupt preempting a start of graph
+	 * tracing in the softirq, and depth can even be 3
+	 * if an NMI came in at the start of an interrupt function
+	 * that preempted a softirq start of a function that
+	 * preempted normal context!!!! Luckily, it can't be
+	 * greater than 3, so the next two bits are a mask
+	 * of what the depth is when we set TRACE_GRAPH_BIT
+	 */
+
+	TRACE_GRAPH_DEPTH_START_BIT,
+	TRACE_GRAPH_DEPTH_END_BIT,
 };
 
 #define trace_recursion_set(bit)	do { (current)->trace_recursion |= (1<<(bit)); } while (0)
 #define trace_recursion_clear(bit)	do { (current)->trace_recursion &= ~(1<<(bit)); } while (0)
 #define trace_recursion_test(bit)	((current)->trace_recursion & (1<<(bit)))
+
+#define trace_recursion_depth() \
+	(((current)->trace_recursion >> TRACE_GRAPH_DEPTH_START_BIT) & 3)
+#define trace_recursion_set_depth(depth) \
+	do {								\
+		current->trace_recursion &=				\
+			~(3 << TRACE_GRAPH_DEPTH_START_BIT);		\
+		current->trace_recursion |=				\
+			((depth) & 3) << TRACE_GRAPH_DEPTH_START_BIT;	\
+	} while (0)
 
 #define TRACE_CONTEXT_BITS	4
 
@@ -794,8 +826,9 @@ extern unsigned long ftrace_graph_funcs[FTRACE_GRAPH_MAX_FUNCS];
 extern int ftrace_graph_notrace_count;
 extern unsigned long ftrace_graph_notrace_funcs[FTRACE_GRAPH_MAX_FUNCS];
 
-static inline int ftrace_graph_addr(unsigned long addr)
+static inline int ftrace_graph_addr(struct ftrace_graph_ent *trace)
 {
+	unsigned long addr = trace->func;
 	int i;
 
 	if (!ftrace_graph_count)
@@ -803,6 +836,13 @@ static inline int ftrace_graph_addr(unsigned long addr)
 
 	for (i = 0; i < ftrace_graph_count; i++) {
 		if (addr == ftrace_graph_funcs[i]) {
+			/*
+			 * This needs to be cleared on the return functions
+			 * when the depth is zero.
+			 */
+			trace_recursion_set(TRACE_GRAPH_BIT);
+			trace_recursion_set_depth(trace->depth);
+
 			/*
 			 * If no irqs are to be traced, but a set_graph_function
 			 * is set, and called by an interrupt handler, we still
@@ -817,6 +857,13 @@ static inline int ftrace_graph_addr(unsigned long addr)
 	}
 
 	return 0;
+}
+
+static inline void ftrace_graph_addr_finish(struct ftrace_graph_ret *trace)
+{
+	if (trace_recursion_test(TRACE_GRAPH_BIT) &&
+	    trace->depth == trace_recursion_depth())
+		trace_recursion_clear(TRACE_GRAPH_BIT);
 }
 
 static inline int ftrace_graph_notrace_addr(unsigned long addr)
@@ -834,7 +881,7 @@ static inline int ftrace_graph_notrace_addr(unsigned long addr)
 	return 0;
 }
 #else
-static inline int ftrace_graph_addr(unsigned long addr)
+static inline int ftrace_graph_addr(struct ftrace_graph_ent *trace)
 {
 	return 1;
 }
@@ -843,6 +890,8 @@ static inline int ftrace_graph_notrace_addr(unsigned long addr)
 {
 	return 0;
 }
+static inline void ftrace_graph_addr_finish(struct ftrace_graph_ret *trace)
+{ }
 #endif /* CONFIG_DYNAMIC_FTRACE */
 #else /* CONFIG_FUNCTION_GRAPH_TRACER */
 static inline enum print_line_t
