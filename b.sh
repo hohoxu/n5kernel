@@ -1,6 +1,6 @@
 #!/bin/sh
 
-export PATH=/home/hongxun/build/aarch64-linux-android-4.9/bin:/study/aarch64-linux-android-4.9/bin:$PATH
+export PATH=/misc/aarch64-linux-android-4.9/bin:/study/aarch64-linux-android-4.9/bin:$PATH
 
 outdir=../out-oneplus
 
