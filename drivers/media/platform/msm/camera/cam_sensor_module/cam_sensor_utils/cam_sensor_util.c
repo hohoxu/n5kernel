@@ -11,6 +11,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/vmalloc.h>
 #include "cam_sensor_util.h"
 #include <cam_mem_mgr.h>
 #include "cam_res_mgr_api.h"
@@ -36,13 +37,26 @@ static struct i2c_settings_list*
 	else
 		return NULL;
 
-	tmp->i2c_settings.reg_setting = (struct cam_sensor_i2c_reg_array *)
-		kzalloc(sizeof(struct cam_sensor_i2c_reg_array) *
-		size, GFP_KERNEL);
-	if (tmp->i2c_settings.reg_setting == NULL) {
-		list_del(&(tmp->list));
-		kfree(tmp);
-		return NULL;
+	if ((sizeof(struct cam_sensor_i2c_reg_array) * size) < PAGE_SIZE) {
+		tmp->i2c_settings.reg_setting =
+			(struct cam_sensor_i2c_reg_array *)
+			kzalloc(sizeof(struct cam_sensor_i2c_reg_array) *
+			size, GFP_KERNEL);
+		if (tmp->i2c_settings.reg_setting == NULL) {
+			list_del(&(tmp->list));
+			kfree(tmp);
+			return NULL;
+		}
+	} else {
+		tmp->i2c_settings.reg_setting =
+			(struct cam_sensor_i2c_reg_array *)
+			vzalloc(sizeof(struct cam_sensor_i2c_reg_array) *
+				size);
+		if (tmp->i2c_settings.reg_setting == NULL) {
+			list_del(&(tmp->list));
+			kfree(tmp);
+			return NULL;
+		}
 	}
 	tmp->i2c_settings.size = size;
 
@@ -61,7 +75,14 @@ int32_t delete_request(struct i2c_settings_array *i2c_array)
 
 	list_for_each_entry_safe(i2c_list, i2c_next,
 		&(i2c_array->list_head), list) {
-		kfree(i2c_list->i2c_settings.reg_setting);
+
+		if ((sizeof(struct cam_sensor_i2c_reg_array) *
+			i2c_list->i2c_settings.size) < PAGE_SIZE) {
+			kfree(i2c_list->i2c_settings.reg_setting);
+		} else {
+			vfree(i2c_list->i2c_settings.reg_setting);
+		}
+
 		list_del(&(i2c_list->list));
 		kfree(i2c_list);
 	}
@@ -128,7 +149,7 @@ int32_t cam_sensor_handle_poll(
 		CAM_ERR(CAM_SENSOR, "Failed in allocating mem for list");
 		return -ENOMEM;
 	}
-
+	(*offset) = 0;//add by HHK fox fix delayus invalid 
 	i2c_list->op_code = CAM_SENSOR_I2C_POLL;
 	i2c_list->i2c_settings.data_type =
 		cond_wait->data_type;
@@ -176,7 +197,7 @@ int32_t cam_sensor_handle_random_write(
 		cam_cmd_i2c_random_wr->header.addr_type;
 	i2c_list->i2c_settings.data_type =
 		cam_cmd_i2c_random_wr->header.data_type;
-
+	(*offset) = 0;//add by HHK fox fix delayus invalid 
 	for (cnt = 0; cnt < (cam_cmd_i2c_random_wr->header.count);
 		cnt++) {
 		i2c_list->i2c_settings.reg_setting[cnt].reg_addr =
@@ -227,7 +248,7 @@ static int32_t cam_sensor_handle_continuous_write(
 		cam_cmd_i2c_continuous_wr->header.data_type;
 	i2c_list->i2c_settings.size =
 		cam_cmd_i2c_continuous_wr->header.count;
-
+	(*offset) = 0;//add by HHK fox fix delayus invalid 
 	for (cnt = 0; cnt < (cam_cmd_i2c_continuous_wr->header.count);
 		cnt++) {
 		i2c_list->i2c_settings.reg_setting[cnt].reg_addr =
@@ -238,41 +259,6 @@ static int32_t cam_sensor_handle_continuous_write(
 	}
 	*offset = cnt;
 	*list = &(i2c_list->list);
-
-	return rc;
-}
-
-static int cam_sensor_handle_slave_info(
-	struct camera_io_master *io_master,
-	uint32_t *cmd_buf)
-{
-	int rc = 0;
-	struct cam_cmd_i2c_info *i2c_info = (struct cam_cmd_i2c_info *)cmd_buf;
-
-	if (io_master == NULL || cmd_buf == NULL) {
-		CAM_ERR(CAM_SENSOR, "Invalid args");
-		return -EINVAL;
-	}
-
-	switch (io_master->master_type) {
-	case CCI_MASTER:
-		io_master->cci_client->sid = (i2c_info->slave_addr >> 1);
-		io_master->cci_client->i2c_freq_mode = i2c_info->i2c_freq_mode;
-		break;
-
-	case I2C_MASTER:
-		io_master->client->addr = i2c_info->slave_addr;
-		break;
-
-	case SPI_MASTER:
-		break;
-
-	default:
-		CAM_ERR(CAM_SENSOR, "Invalid master type: %d",
-			io_master->master_type);
-		rc = -EINVAL;
-		break;
-	}
 
 	return rc;
 }
@@ -288,16 +274,12 @@ static int cam_sensor_handle_slave_info(
  * WAIT + n x RND_WR with num_cmd_buf = 1. Do not exepect RD/WR
  * with different cmd_type and op_code in one command buffer.
  */
-int cam_sensor_i2c_command_parser(
-	struct camera_io_master *io_master,
-	struct i2c_settings_array *i2c_reg_settings,
-	struct cam_cmd_buf_desc   *cmd_desc,
-	int32_t num_cmd_buffers)
+int cam_sensor_i2c_command_parser(struct i2c_settings_array *i2c_reg_settings,
+	struct cam_cmd_buf_desc   *cmd_desc, int32_t num_cmd_buffers)
 {
 	int16_t                   rc = 0, i = 0;
 	size_t                    len_of_buff = 0;
 	uint64_t                  generic_ptr;
-	uint16_t                  cmd_length_in_bytes = 0;
 
 	for (i = 0; i < num_cmd_buffers; i++) {
 		uint32_t                  *cmd_buf = NULL;
@@ -311,6 +293,7 @@ int cam_sensor_i2c_command_parser(
 		 * It is not expected the same settings to
 		 * be spread across multiple cmd buffers
 		 */
+
 		CAM_DBG(CAM_SENSOR, "Total cmd Buf in Bytes: %d",
 			cmd_desc[i].length);
 
@@ -411,22 +394,6 @@ int cam_sensor_i2c_command_parser(
 				}
 				break;
 			}
-			case CAMERA_SENSOR_CMD_TYPE_I2C_INFO: {
-				rc = cam_sensor_handle_slave_info(
-					io_master, cmd_buf);
-				if (rc) {
-					CAM_ERR(CAM_SENSOR,
-						"Handle slave info failed with rc: %d",
-						rc);
-					return rc;
-				}
-				cmd_length_in_bytes =
-					sizeof(struct cam_cmd_i2c_info);
-				cmd_buf +=
-					cmd_length_in_bytes / sizeof(uint32_t);
-				byte_cnt += cmd_length_in_bytes;
-				break;
-			}
 			default:
 				CAM_ERR(CAM_SENSOR, "Invalid Command Type:%d",
 					 cmm_hdr->cmd_type);
@@ -434,75 +401,6 @@ int cam_sensor_i2c_command_parser(
 			}
 		}
 		i2c_reg_settings->is_settings_valid = 1;
-	}
-
-	return rc;
-}
-
-int cam_sensor_util_i2c_apply_setting(
-	struct camera_io_master *io_master_info,
-	struct i2c_settings_list *i2c_list)
-{
-	int32_t rc = 0;
-	uint32_t i, size;
-
-	switch (i2c_list->op_code) {
-	case CAM_SENSOR_I2C_WRITE_RANDOM: {
-		rc = camera_io_dev_write(io_master_info,
-			&(i2c_list->i2c_settings));
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR,
-				"Failed to random write I2C settings: %d",
-				rc);
-			return rc;
-		}
-	break;
-	}
-	case CAM_SENSOR_I2C_WRITE_SEQ: {
-		rc = camera_io_dev_write_continuous(
-			io_master_info, &(i2c_list->i2c_settings), 0);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR,
-				"Failed to seq write I2C settings: %d",
-				rc);
-			return rc;
-		}
-	break;
-	}
-	case CAM_SENSOR_I2C_WRITE_BURST: {
-		rc = camera_io_dev_write_continuous(
-			io_master_info, &(i2c_list->i2c_settings), 1);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR,
-				"Failed to burst write I2C settings: %d",
-				rc);
-			return rc;
-		}
-	break;
-	}
-	case CAM_SENSOR_I2C_POLL: {
-		size = i2c_list->i2c_settings.size;
-		for (i = 0; i < size; i++) {
-			rc = camera_io_dev_poll(
-			io_master_info,
-			i2c_list->i2c_settings.reg_setting[i].reg_addr,
-			i2c_list->i2c_settings.reg_setting[i].reg_data,
-			i2c_list->i2c_settings.reg_setting[i].data_mask,
-			i2c_list->i2c_settings.addr_type,
-			i2c_list->i2c_settings.data_type,
-			i2c_list->i2c_settings.reg_setting[i].delay);
-			if (rc < 0) {
-				CAM_ERR(CAM_SENSOR,
-					"i2c poll apply setting Fail: %d", rc);
-				return rc;
-			}
-		}
-	break;
-	}
-	default:
-		CAM_ERR(CAM_SENSOR, "Wrong Opcode: %d", i2c_list->op_code);
-		rc = -EINVAL;
-	break;
 	}
 
 	return rc;
@@ -767,6 +665,7 @@ int32_t cam_sensor_update_power_settings(void *cmd_buf,
 	}
 
 	power_info->power_setting_size = 0;
+	kfree(power_info->power_setting);
 	power_info->power_setting =
 		(struct cam_sensor_power_setting *)
 		kzalloc(sizeof(struct cam_sensor_power_setting) *
@@ -775,6 +674,7 @@ int32_t cam_sensor_update_power_settings(void *cmd_buf,
 		return -ENOMEM;
 
 	power_info->power_down_setting_size = 0;
+	kfree(power_info->power_down_setting);
 	power_info->power_down_setting =
 		(struct cam_sensor_power_setting *)
 		kzalloc(sizeof(struct cam_sensor_power_setting) *
@@ -961,6 +861,9 @@ int cam_get_dt_power_setting_data(struct device_node *of_node,
 	ps = kcalloc(count, sizeof(*ps), GFP_KERNEL);
 	if (!ps)
 		return -ENOMEM;
+
+	kfree(power_info->power_setting);
+
 	power_info->power_setting = ps;
 
 	for (i = 0; i < count; i++) {
@@ -1018,6 +921,7 @@ int cam_get_dt_power_setting_data(struct device_node *of_node,
 	}
 	kfree(array);
 
+	kfree(power_info->power_down_setting);
 	power_info->power_down_setting =
 		kzalloc(sizeof(*ps) * count, GFP_KERNEL);
 
@@ -1287,24 +1191,6 @@ int msm_camera_pinctrl_init(
 	return 0;
 }
 
-int cam_sensor_bob_pwm_mode_switch(struct cam_hw_soc_info *soc_info,
-	int bob_reg_idx, bool flag)
-{
-	int rc = 0;
-	uint32_t op_current =
-		(flag == true) ? soc_info->rgltr_op_mode[bob_reg_idx] : 0;
-
-	if (soc_info->rgltr[bob_reg_idx] != NULL) {
-		rc = regulator_set_load(soc_info->rgltr[bob_reg_idx],
-			op_current);
-		if (rc)
-			CAM_WARN(CAM_SENSOR,
-				"BoB PWM SetLoad failed rc: %d", rc);
-	}
-
-	return rc;
-}
-
 int msm_cam_sensor_handle_reg_gpio(int seq_type,
 	struct msm_camera_gpio_num_info *gpio_num_info, int val)
 {
@@ -1392,13 +1278,6 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 	for (index = 0; index < ctrl->power_setting_size; index++) {
 		CAM_DBG(CAM_SENSOR, "index: %d", index);
 		power_setting = &ctrl->power_setting[index];
-		if (!power_setting) {
-			CAM_ERR(CAM_SENSOR,
-				"Invalid power up settings for index %d",
-				index);
-			return -EINVAL;
-		}
-
 		CAM_DBG(CAM_SENSOR, "seq_type %d", power_setting->seq_type);
 
 		switch (power_setting->seq_type) {
@@ -1639,7 +1518,7 @@ power_up_failed:
 		if (ret)
 			CAM_ERR(CAM_SENSOR, "cannot set pin to suspend state");
 		cam_res_mgr_shared_pinctrl_select_state(false);
-		devm_pinctrl_put(ctrl->pinctrl_info.pinctrl);
+		pinctrl_put(ctrl->pinctrl_info.pinctrl);
 		cam_res_mgr_shared_pinctrl_put();
 	}
 
@@ -1722,12 +1601,12 @@ static int cam_config_mclk_reg(struct cam_sensor_power_ctrl_t *ctrl,
 	return rc;
 }
 
-int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
+int msm_camera_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 		struct cam_hw_soc_info *soc_info)
 {
 	int index = 0, ret = 0, num_vreg = 0, i;
 	struct cam_sensor_power_setting *pd = NULL;
-	struct cam_sensor_power_setting *ps = NULL;
+	struct cam_sensor_power_setting *ps;
 	struct msm_camera_gpio_num_info *gpio_num_info = NULL;
 
 	CAM_DBG(CAM_SENSOR, "Enter");
@@ -1747,13 +1626,6 @@ int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 	for (index = 0; index < ctrl->power_down_setting_size; index++) {
 		CAM_DBG(CAM_SENSOR, "index %d",  index);
 		pd = &ctrl->power_down_setting[index];
-		if (!pd) {
-			CAM_ERR(CAM_SENSOR,
-				"Invalid power down settings for index %d",
-				index);
-			return -EINVAL;
-		}
-
 		ps = NULL;
 		CAM_DBG(CAM_SENSOR, "type %d",  pd->seq_type);
 		switch (pd->seq_type) {
@@ -1853,7 +1725,7 @@ int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 			CAM_ERR(CAM_SENSOR, "cannot set pin to suspend state");
 
 		cam_res_mgr_shared_pinctrl_select_state(false);
-		devm_pinctrl_put(ctrl->pinctrl_info.pinctrl);
+		pinctrl_put(ctrl->pinctrl_info.pinctrl);
 		cam_res_mgr_shared_pinctrl_put();
 	}
 

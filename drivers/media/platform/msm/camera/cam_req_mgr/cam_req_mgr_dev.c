@@ -236,14 +236,15 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		if (copy_from_user(&ses_info,
 			(void *)k_ioctl->handle,
-			k_ioctl->size)) {
+			sizeof(struct cam_req_mgr_session_info))) {
 			return -EFAULT;
 		}
 
 		rc = cam_req_mgr_create_session(&ses_info);
 		if (!rc)
 			if (copy_to_user((void *)k_ioctl->handle,
-				&ses_info, k_ioctl->size))
+				&ses_info,
+				sizeof(struct cam_req_mgr_session_info)))
 				rc = -EFAULT;
 		}
 		break;
@@ -256,7 +257,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		if (copy_from_user(&ses_info,
 			(void *)k_ioctl->handle,
-			k_ioctl->size)) {
+			sizeof(struct cam_req_mgr_session_info))) {
 			return -EFAULT;
 		}
 
@@ -272,14 +273,15 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		if (copy_from_user(&link_info,
 			(void *)k_ioctl->handle,
-			k_ioctl->size)) {
+			sizeof(struct cam_req_mgr_link_info))) {
 			return -EFAULT;
 		}
 
 		rc = cam_req_mgr_link(&link_info);
 		if (!rc)
 			if (copy_to_user((void *)k_ioctl->handle,
-				&link_info, k_ioctl->size))
+				&link_info,
+				sizeof(struct cam_req_mgr_link_info)))
 				rc = -EFAULT;
 		}
 		break;
@@ -292,7 +294,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		if (copy_from_user(&unlink_info,
 			(void *)k_ioctl->handle,
-			k_ioctl->size)) {
+			sizeof(struct cam_req_mgr_unlink_info))) {
 			return -EFAULT;
 		}
 
@@ -308,7 +310,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		if (copy_from_user(&sched_req,
 			(void *)k_ioctl->handle,
-			k_ioctl->size)) {
+			sizeof(struct cam_req_mgr_sched_request))) {
 			return -EFAULT;
 		}
 
@@ -324,7 +326,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		if (copy_from_user(&flush_info,
 			(void *)k_ioctl->handle,
-			k_ioctl->size)) {
+			sizeof(struct cam_req_mgr_flush_info))) {
 			return -EFAULT;
 		}
 
@@ -340,7 +342,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		if (copy_from_user(&sync_info,
 			(void *)k_ioctl->handle,
-			k_ioctl->size)) {
+			sizeof(struct cam_req_mgr_sync_mode))) {
 			return -EFAULT;
 		}
 
@@ -355,7 +357,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		if (copy_from_user(&cmd,
 			(void *)k_ioctl->handle,
-			k_ioctl->size)) {
+			sizeof(struct cam_mem_mgr_alloc_cmd))) {
 			rc = -EFAULT;
 			break;
 		}
@@ -363,7 +365,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 		rc = cam_mem_mgr_alloc_and_map(&cmd);
 		if (!rc)
 			if (copy_to_user((void *)k_ioctl->handle,
-				&cmd, k_ioctl->size)) {
+				&cmd, sizeof(struct cam_mem_mgr_alloc_cmd))) {
 				rc = -EFAULT;
 				break;
 			}
@@ -377,7 +379,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		if (copy_from_user(&cmd,
 			(void *)k_ioctl->handle,
-			k_ioctl->size)) {
+			sizeof(struct cam_mem_mgr_map_cmd))) {
 			rc = -EFAULT;
 			break;
 		}
@@ -385,7 +387,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 		rc = cam_mem_mgr_map(&cmd);
 		if (!rc)
 			if (copy_to_user((void *)k_ioctl->handle,
-				&cmd, k_ioctl->size)) {
+				&cmd, sizeof(struct cam_mem_mgr_map_cmd))) {
 				rc = -EFAULT;
 				break;
 			}
@@ -399,7 +401,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		if (copy_from_user(&cmd,
 			(void *)k_ioctl->handle,
-			k_ioctl->size)) {
+			sizeof(struct cam_mem_mgr_release_cmd))) {
 			rc = -EFAULT;
 			break;
 		}
@@ -415,7 +417,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		if (copy_from_user(&cmd,
 			(void *)k_ioctl->handle,
-			k_ioctl->size)) {
+			sizeof(struct cam_mem_cache_ops_cmd))) {
 			rc = -EFAULT;
 			break;
 		}
@@ -433,7 +435,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		if (copy_from_user(&cmd,
 			(void __user *)k_ioctl->handle,
-			k_ioctl->size)) {
+			sizeof(struct cam_req_mgr_link_control))) {
 			rc = -EFAULT;
 			break;
 		}
@@ -598,6 +600,8 @@ EXPORT_SYMBOL(cam_unregister_subdev);
 
 static int cam_req_mgr_remove(struct platform_device *pdev)
 {
+	kmem_cache_destroy(g_cam_req_mgr_timer_cachep);
+	g_cam_req_mgr_timer_cachep = NULL;
 	cam_req_mgr_core_device_deinit();
 	cam_req_mgr_util_deinit();
 	cam_media_device_cleanup();
@@ -648,9 +652,8 @@ static int cam_req_mgr_probe(struct platform_device *pdev)
 
 	if (g_cam_req_mgr_timer_cachep == NULL) {
 		g_cam_req_mgr_timer_cachep = kmem_cache_create("crm_timer",
-			sizeof(struct cam_req_mgr_timer), 64,
-			SLAB_CONSISTENCY_CHECKS | SLAB_RED_ZONE |
-			SLAB_POISON | SLAB_STORE_USER, NULL);
+			sizeof(struct cam_req_mgr_timer), 0,
+			SLAB_HWCACHE_ALIGN, NULL);
 		if (!g_cam_req_mgr_timer_cachep)
 			CAM_ERR(CAM_CRM,
 				"Failed to create kmem_cache for crm_timer");
