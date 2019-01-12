@@ -25,7 +25,6 @@
 #include "cam_subdev.h"
 #include "cam_mem_mgr.h"
 #include "cam_debug_util.h"
-#include "cam_common_util.h"
 #include <linux/slub_def.h>
 
 #define CAM_REQ_MGR_EVENT_MAX 30
@@ -236,15 +235,14 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -EINVAL;
 
 		if (copy_from_user(&ses_info,
-			u64_to_user_ptr(k_ioctl->handle),
+			(void *)k_ioctl->handle,
 			k_ioctl->size)) {
 			return -EFAULT;
 		}
 
 		rc = cam_req_mgr_create_session(&ses_info);
 		if (!rc)
-			if (copy_to_user(
-				u64_to_user_ptr(k_ioctl->handle),
+			if (copy_to_user((void *)k_ioctl->handle,
 				&ses_info, k_ioctl->size))
 				rc = -EFAULT;
 		}
@@ -257,7 +255,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -EINVAL;
 
 		if (copy_from_user(&ses_info,
-			u64_to_user_ptr(k_ioctl->handle),
+			(void *)k_ioctl->handle,
 			k_ioctl->size)) {
 			return -EFAULT;
 		}
@@ -273,15 +271,14 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -EINVAL;
 
 		if (copy_from_user(&link_info,
-			u64_to_user_ptr(k_ioctl->handle),
+			(void *)k_ioctl->handle,
 			k_ioctl->size)) {
 			return -EFAULT;
 		}
 
 		rc = cam_req_mgr_link(&link_info);
 		if (!rc)
-			if (copy_to_user(
-				u64_to_user_ptr(k_ioctl->handle),
+			if (copy_to_user((void *)k_ioctl->handle,
 				&link_info, k_ioctl->size))
 				rc = -EFAULT;
 		}
@@ -294,7 +291,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -EINVAL;
 
 		if (copy_from_user(&unlink_info,
-			u64_to_user_ptr(k_ioctl->handle),
+			(void *)k_ioctl->handle,
 			k_ioctl->size)) {
 			return -EFAULT;
 		}
@@ -310,7 +307,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -EINVAL;
 
 		if (copy_from_user(&sched_req,
-			u64_to_user_ptr(k_ioctl->handle),
+			(void *)k_ioctl->handle,
 			k_ioctl->size)) {
 			return -EFAULT;
 		}
@@ -326,7 +323,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -EINVAL;
 
 		if (copy_from_user(&flush_info,
-			u64_to_user_ptr(k_ioctl->handle),
+			(void *)k_ioctl->handle,
 			k_ioctl->size)) {
 			return -EFAULT;
 		}
@@ -342,7 +339,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -EINVAL;
 
 		if (copy_from_user(&sync_info,
-			u64_to_user_ptr(k_ioctl->handle),
+			(void *)k_ioctl->handle,
 			k_ioctl->size)) {
 			return -EFAULT;
 		}
@@ -357,7 +354,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -EINVAL;
 
 		if (copy_from_user(&cmd,
-			u64_to_user_ptr(k_ioctl->handle),
+			(void *)k_ioctl->handle,
 			k_ioctl->size)) {
 			rc = -EFAULT;
 			break;
@@ -365,8 +362,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		rc = cam_mem_mgr_alloc_and_map(&cmd);
 		if (!rc)
-			if (copy_to_user(
-				u64_to_user_ptr(k_ioctl->handle),
+			if (copy_to_user((void *)k_ioctl->handle,
 				&cmd, k_ioctl->size)) {
 				rc = -EFAULT;
 				break;
@@ -380,7 +376,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -EINVAL;
 
 		if (copy_from_user(&cmd,
-			u64_to_user_ptr(k_ioctl->handle),
+			(void *)k_ioctl->handle,
 			k_ioctl->size)) {
 			rc = -EFAULT;
 			break;
@@ -388,8 +384,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 
 		rc = cam_mem_mgr_map(&cmd);
 		if (!rc)
-			if (copy_to_user(
-				u64_to_user_ptr(k_ioctl->handle),
+			if (copy_to_user((void *)k_ioctl->handle,
 				&cmd, k_ioctl->size)) {
 				rc = -EFAULT;
 				break;
@@ -403,7 +398,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -EINVAL;
 
 		if (copy_from_user(&cmd,
-			u64_to_user_ptr(k_ioctl->handle),
+			(void *)k_ioctl->handle,
 			k_ioctl->size)) {
 			rc = -EFAULT;
 			break;
@@ -419,7 +414,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -EINVAL;
 
 		if (copy_from_user(&cmd,
-			u64_to_user_ptr(k_ioctl->handle),
+			(void *)k_ioctl->handle,
 			k_ioctl->size)) {
 			rc = -EFAULT;
 			break;
@@ -437,7 +432,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -EINVAL;
 
 		if (copy_from_user(&cmd,
-			u64_to_user_ptr(k_ioctl->handle),
+			(void __user *)k_ioctl->handle,
 			k_ioctl->size)) {
 			rc = -EFAULT;
 			break;
