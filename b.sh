@@ -1,6 +1,6 @@
 #!/bin/sh
 
-export PATH=/misc/gcc-arm-8.2-2018.11-x86_64-aarch64-linux-gnu/bin:/study/gcc-arm-8.2-2018.11-x86_64-aarch64-linux-gnu/bin:$PATH
+export PATH=/misc/gcc-arm-8.2-2019.01-x86_64-aarch64-linux-gnu/bin:/study/gcc-arm-8.2-2019.01-x86_64-aarch64-linux-gnu/bin:$PATH
 
 outdir=../out-oneplus
 
