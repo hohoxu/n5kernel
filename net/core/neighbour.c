@@ -877,7 +877,7 @@ static void neigh_probe(struct neighbour *neigh)
 	if (neigh->ops->solicit)
 		neigh->ops->solicit(neigh, skb);
 	atomic_inc(&neigh->probes);
-	kfree_skb(skb);
+	consume_skb(skb);
 }
 
 /* Called when a timer expires for a neighbour entry. */
