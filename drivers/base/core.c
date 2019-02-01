@@ -298,6 +298,11 @@ EXPORT_SYMBOL_GPL(device_link_add);
 
 static void device_link_free(struct device_link *link)
 {
+	if (link->rpm_active) {
+		pm_runtime_put(link->supplier);
+		link->rpm_active = false;
+	}
+
 	put_device(link->consumer);
 	put_device(link->supplier);
 	kfree(link);
