@@ -128,7 +128,7 @@ static unsigned long super_cache_count(struct shrinker *shrink,
 	 *
 	 * However, if we are currently mounting the superblock, the underlying
 	 * filesystem might be in a state of partial construction and hence it
-	 * is dangerous to access it.  trylock_super() uses a SB_BORN check to
+	 * is dangerous to access it.  trylock_super() uses a MS_BORN check to
 	 * avoid this situation, so do the same here. The memory barrier is
 	 * matched with the one in mount_fs() as we don't hold locks here.
 	 */
@@ -1224,8 +1224,8 @@ mount_fs(struct file_system_type *type, int flags, const char *name, struct vfsm
 
 	/*
 	 * Write barrier is for super_cache_count(). We place it before setting
-	 * SB_BORN as the data dependency between the two functions is the
-	 * superblock structure contents that we just set up, not the SB_BORN
+	 * MS_BORN as the data dependency between the two functions is the
+	 * superblock structure contents that we just set up, not the MS_BORN
 	 * flag.
 	 */
 	smp_wmb();
