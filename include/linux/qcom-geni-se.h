@@ -71,6 +71,7 @@ struct se_geni_rsc {
 };
 
 #define PINCTRL_DEFAULT	"default"
+#define PINCTRL_ACTIVE	"active"
 #define PINCTRL_SLEEP	"sleep"
 #define PINCTRL_RESET	"reset"
 #define KHz(freq) (1000 * (freq))
