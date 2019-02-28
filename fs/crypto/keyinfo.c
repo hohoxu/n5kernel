@@ -129,45 +129,7 @@ invalid:
 	return ERR_PTR(-ENOKEY);
 }
 
-<<<<<<< HEAD
-/* Find the master key, then derive the inode's actual encryption key */
-static int find_and_derive_key(const struct inode *inode,
-			       const struct fscrypt_context *ctx,
-			       u8 *derived_key, unsigned int derived_keysize)
-{
-	struct key *key;
-	const struct fscrypt_key *payload;
-	int err;
-
-	key = find_and_lock_process_key(FS_KEY_DESC_PREFIX,
-					ctx->master_key_descriptor,
-					derived_keysize, &payload);
-	if (key == ERR_PTR(-ENOKEY) && inode->i_sb->s_cop->key_prefix) {
-		key = find_and_lock_process_key(inode->i_sb->s_cop->key_prefix,
-						ctx->master_key_descriptor,
-						derived_keysize, &payload);
-	}
-	if (IS_ERR(key))
-		return PTR_ERR(key);
-	err = derive_key_aes(payload->raw, ctx, derived_key, derived_keysize);
-        /* If we don't need to derive, we still want to do everything
-         * up until now to validate the key. It's cleaner to fail now
-         * than to fail in block I/O.
-	 */
-	up_read(&key->sem);
-	key_put(key);
-	return err;
-}
-
-static struct fscrypt_mode {
-	const char *friendly_name;
-	const char *cipher_str;
-	int keysize;
-	bool logged_impl_name;
-} available_modes[] = {
-=======
 static struct fscrypt_mode available_modes[] = {
->>>>>>> e33fa31e300e4... BACKPORT, FROMGIT: fscrypt: add Adiantum support
 	[FS_ENCRYPTION_MODE_AES_256_XTS] = {
 		.friendly_name = "AES-256-XTS",
 		.cipher_str = "xts(aes)",
@@ -207,7 +169,7 @@ static struct fscrypt_mode available_modes[] = {
 };
 
 static struct fscrypt_mode *
-select_encryption_mode(const struct fscrypt_info *ci, const struct inode *inode)
+select_encryption_mode(struct fscrypt_info *ci, const struct inode *inode)
 {
 	if (!fscrypt_valid_enc_modes(ci->ci_data_mode, ci->ci_filename_mode)) {
 		fscrypt_warn(inode->i_sb,
@@ -217,11 +179,15 @@ select_encryption_mode(const struct fscrypt_info *ci, const struct inode *inode)
 		return ERR_PTR(-EINVAL);
 	}
 
-	if (S_ISREG(inode->i_mode))
+	if (S_ISREG(inode->i_mode)) {
+		ci->ci_type = CI_DATA_TYPE;
 		return &available_modes[ci->ci_data_mode];
+	}
 
-	if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))
+	if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode)) {
+		ci->ci_type = CI_FNAME_TYPE;
 		return &available_modes[ci->ci_filename_mode];
+	}
 
 	WARN_ONCE(1, "fscrypt: filesystem tried to load encryption info for inode %lu, which is not encryptable (file type %d)\n",
 		  inode->i_ino, (inode->i_mode & S_IFMT));
@@ -336,7 +302,6 @@ static void put_master_key(struct fscrypt_master_key *mk)
 		return;
 	hash_del(&mk->mk_node);
 	spin_unlock(&fscrypt_master_keys_lock);
-
 	free_master_key(mk);
 }
 
@@ -487,6 +452,17 @@ void __exit fscrypt_essiv_cleanup(void)
 	crypto_free_shash(essiv_hash_tfm);
 }
 
+static int fscrypt_data_encryption_mode(struct inode *inode)
+{
+	return fscrypt_is_ice_capable(inode->i_sb) ?
+	FS_ENCRYPTION_MODE_PRIVATE : FS_ENCRYPTION_MODE_AES_256_XTS;
+}
+
+int fscrypt_get_mode_key_size(int mode)
+{
+	return available_modes[mode].keysize;
+}
+EXPORT_SYMBOL(fscrypt_get_mode_key_size);
 /*
  * Given the encryption mode and key (normally the derived key, but for
  * FS_POLICY_FLAG_DIRECT_KEY mode it's the master key), set up the inode's
@@ -541,6 +517,7 @@ static void put_crypt_info(struct fscrypt_info *ci)
 		crypto_free_skcipher(ci->ci_ctfm);
 		crypto_free_cipher(ci->ci_essiv_tfm);
 	}
+	memset(ci, 0, sizeof(*ci)); /* sanitizes ->ci_raw_key */
 	kmem_cache_free(fscrypt_info_cachep, ci);
 }
 
@@ -613,7 +590,6 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	if (res)
 		goto out;
 
-<<<<<<< HEAD
 	if (is_private_data_mode(crypt_info)) {
 		if (!fscrypt_is_ice_capable(inode->i_sb)) {
 			pr_warn("%s: ICE support not available\n",
@@ -626,52 +602,13 @@ int fscrypt_get_encryption_info(struct inode *inode)
 		goto do_ice;
 	}
 
-	ctfm = crypto_alloc_skcipher(mode->cipher_str, 0, 0);
-	if (IS_ERR(ctfm)) {
-		res = PTR_ERR(ctfm);
-		fscrypt_warn(inode->i_sb,
-			     "error allocating '%s' transform for inode %lu: %d",
-			     mode->cipher_str, inode->i_ino, res);
-		goto out;
-	}
-	if (unlikely(!mode->logged_impl_name)) {
-		/*
-		 * fscrypt performance can vary greatly depending on which
-		 * crypto algorithm implementation is used.  Help people debug
-		 * performance problems by logging the ->cra_driver_name the
-		 * first time a mode is used.  Note that multiple threads can
-		 * race here, but it doesn't really matter.
-		 */
-		mode->logged_impl_name = true;
-		pr_info("fscrypt: %s using implementation \"%s\"\n",
-			mode->friendly_name,
-			crypto_skcipher_alg(ctfm)->base.cra_driver_name);
-	}
-	crypt_info->ci_ctfm = ctfm;
-	crypto_skcipher_set_flags(ctfm, CRYPTO_TFM_REQ_WEAK_KEY);
-	res = crypto_skcipher_setkey(ctfm, raw_key, mode->keysize);
-	if (res)
-		goto out;
-
-	if (S_ISREG(inode->i_mode) &&
-	    crypt_info->ci_data_mode == FS_ENCRYPTION_MODE_AES_128_CBC) {
-		res = init_essiv_generator(crypt_info, raw_key, mode->keysize);
-		if (res) {
-			fscrypt_warn(inode->i_sb,
-				     "error initializing ESSIV generator for inode %lu: %d",
-				     inode->i_ino, res);
-			goto out;
-		}
-	}
-	memzero_explicit(crypt_info->ci_raw_key,
-		sizeof(crypt_info->ci_raw_key));
-do_ice:
-=======
 	res = setup_crypto_transform(crypt_info, mode, raw_key, inode);
 	if (res)
 		goto out;
 
->>>>>>> e33fa31e300e4... BACKPORT, FROMGIT: fscrypt: add Adiantum support
+	memzero_explicit(crypt_info->ci_raw_key,
+		sizeof(crypt_info->ci_raw_key));
+do_ice:
 	if (cmpxchg(&inode->i_crypt_info, NULL, crypt_info) == NULL)
 		crypt_info = NULL;
 out:
