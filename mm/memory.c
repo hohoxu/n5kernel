@@ -3545,11 +3545,14 @@ static int do_shared_fault(struct fault_env *fe, pgoff_t pgoff)
  * but allow concurrent faults).
  * The mmap_sem may have been released depending on flags and our
  * return value.  See filemap_fault() and __lock_page_or_retry().
+ * If mmap_sem is released, vma may become invalid (for example
+ * by other thread calling munmap()).
  */
 static int do_fault(struct fault_env *fe)
 {
 	struct vm_area_struct *vma = fe->vma;
 	pgoff_t pgoff = linear_page_index(vma, fe->address);
+	struct mm_struct *vm_mm = vma->vm_mm;
 	int ret;
 
 	/* The VMA was not fully populated on mmap() or missing VM_DONTEXPAND */
@@ -3564,7 +3567,7 @@ static int do_fault(struct fault_env *fe)
 
 	/* preallocated pagetable is unused: free it */
 	if (fe->prealloc_pte) {
-		pte_free(vma->vm_mm, fe->prealloc_pte);
+		pte_free(vm_mm, fe->prealloc_pte);
 		fe->prealloc_pte = 0;
 	}
 	return ret;
