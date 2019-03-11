@@ -663,8 +663,8 @@ static enum ipa_client_cb_type ipa_get_client_cb_type(
 
 	return client_cb;
 }
-void ipa3_register_lock_unlock_callback(int (*client_cb)(bool is_lock),
-						u32 ipa_ep_idx)
+void ipa3_register_client_callback(int (*client_cb)(bool is_lock),
+				bool (*teth_port_state)(void), u32 ipa_ep_idx)
 {
 	enum ipa_client_cb_type client;
 	enum ipa_client_type client_type;
@@ -683,10 +683,12 @@ void ipa3_register_lock_unlock_callback(int (*client_cb)(bool is_lock),
 
 	if (!ipa3_ctx->client_lock_unlock[client])
 		ipa3_ctx->client_lock_unlock[client] = client_cb;
+	if (!ipa3_ctx->get_teth_port_state[client])
+		ipa3_ctx->get_teth_port_state[client] = teth_port_state;
 	IPADBG("exit\n");
 }
 
-void ipa3_deregister_lock_unlock_callback(u32 ipa_ep_idx)
+void ipa3_deregister_client_callback(u32 ipa_ep_idx)
 {
 	enum ipa_client_cb_type client_cb;
 	enum ipa_client_type client_type;
@@ -698,12 +700,14 @@ void ipa3_deregister_lock_unlock_callback(u32 ipa_ep_idx)
 	if (client_cb == IPA_MAX_CLNT)
 		return;
 
-	if (ipa3_ctx->client_lock_unlock[client_cb] == NULL) {
+	if (ipa3_ctx->client_lock_unlock[client_cb] == NULL &&
+		ipa3_ctx->get_teth_port_state[client_cb] == NULL) {
 		IPAERR("client_lock_unlock is already NULL");
 		return;
 	}
 
 	ipa3_ctx->client_lock_unlock[client_cb] = NULL;
+	ipa3_ctx->get_teth_port_state[client_cb] = NULL;
 	IPADBG("exit\n");
 }
 
@@ -1390,6 +1394,18 @@ int ipa3_set_reset_client_prod_pipe_delay(bool set_reset,
 	}
 	client_lock_unlock_cb(client, false);
 	return result;
+}
+
+static bool ipa3_get_teth_port_status(enum ipa_client_type client)
+{
+	enum ipa_client_cb_type client_cb;
+
+	client_cb = ipa_get_client_cb_type(client);
+	if (client_cb == IPA_MAX_CLNT)
+		return false;
+	if (ipa3_ctx->get_teth_port_state[client_cb])
+		return ipa3_ctx->get_teth_port_state[client_cb]();
+	return false;
 }
 
 int ipa3_set_reset_client_cons_pipe_sus_holb(bool set_reset,
