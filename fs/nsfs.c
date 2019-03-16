@@ -84,13 +84,12 @@ slow:
 	inode->i_fop = &ns_file_operations;
 	inode->i_private = ns;
 
-	dentry = d_alloc_pseudo(mnt->mnt_sb, &qname);
+	dentry = __d_alloc(mnt->mnt_sb, NULL);
 	if (!dentry) {
 		iput(inode);
 		return ERR_PTR(-ENOMEM);
 	}
 	d_instantiate(dentry, inode);
-	dentry->d_flags |= DCACHE_RCUACCESS;
 	dentry->d_fsdata = (void *)ns->ops;
 	d = atomic_long_cmpxchg(&ns->stashed, 0, (unsigned long)dentry);
 	if (d) {
