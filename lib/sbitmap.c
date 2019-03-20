@@ -243,10 +243,11 @@ static unsigned int __sbitmap_weight(const struct sbitmap *sb, bool set)
 	return weight;
 }
 
-static unsigned int sbitmap_weight(const struct sbitmap *sb)
+unsigned int sbitmap_weight(const struct sbitmap *sb)
 {
 	return __sbitmap_weight(sb, true);
 }
+EXPORT_SYMBOL_GPL(sbitmap_weight);
 
 static unsigned int sbitmap_cleared(const struct sbitmap *sb)
 {

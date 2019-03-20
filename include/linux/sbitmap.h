@@ -287,6 +287,8 @@ static inline int sbitmap_test_bit(struct sbitmap *sb, unsigned int bitnr)
 	return test_bit(SB_NR_TO_BIT(sb, bitnr), __sbitmap_word(sb, bitnr));
 }
 
+unsigned int sbitmap_weight(const struct sbitmap *sb);
+
 /**
  * sbitmap_queue_init_node() - Initialize a &struct sbitmap_queue on a specific
  * memory node.
