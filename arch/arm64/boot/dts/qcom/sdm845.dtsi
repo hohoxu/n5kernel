@@ -3493,9 +3493,9 @@
 
 		gpu-virt-max-step {
 			polling-delay-passive = <10>;
-			polling-delay = <100>;
+			polling-delay = <0>;
 			thermal-governor = "step_wise";
-			wake-capable-sensor;
+			disable-thermal-zone;
 			trips {
 				gpu_trip0: gpu-trip0 {
 					temperature = <95000>;
