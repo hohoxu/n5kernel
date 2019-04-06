@@ -727,7 +727,6 @@ asmlinkage int __exception do_debug_exception(unsigned long addr_if_watchpoint,
 					      struct pt_regs *regs)
 {
 	const struct fault_info *inf = debug_fault_info + DBG_ESR_EVT(esr);
-	unsigned long pc = instruction_pointer(regs);
 	struct siginfo info;
 	unsigned long pc = instruction_pointer(regs);
 	int rv;
