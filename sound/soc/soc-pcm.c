@@ -1033,6 +1033,9 @@ interface_err:
 codec_err:
 	while (--i >= 0) {
 		struct snd_soc_dai *codec_dai = rtd->codec_dais[i];
+		if (!snd_soc_dai_stream_valid(codec_dai, substream->stream))
+			continue;
+
 		if (codec_dai->driver->ops && codec_dai->driver->ops->hw_free)
 			codec_dai->driver->ops->hw_free(substream, codec_dai);
 		codec_dai->rate = 0;
@@ -1094,6 +1097,9 @@ static int soc_pcm_hw_free(struct snd_pcm_substream *substream)
 	/* now free hw params for the DAIs  */
 	for (i = 0; i < rtd->num_codecs; i++) {
 		codec_dai = rtd->codec_dais[i];
+		if (!snd_soc_dai_stream_valid(codec_dai, substream->stream))
+			continue;
+
 		if (codec_dai->driver->ops && codec_dai->driver->ops->hw_free)
 			codec_dai->driver->ops->hw_free(substream, codec_dai);
 	}
