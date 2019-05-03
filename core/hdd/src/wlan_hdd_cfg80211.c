@@ -4551,7 +4551,8 @@ static int hdd_get_cached_station_remote(hdd_context_t *hdd_ctx,
 			(sizeof(stainfo->rx_mc_bc_cnt) +
 			 NLA_HDRLEN) +
 			(sizeof(stainfo->rx_retry_cnt) +
-			 NLA_HDRLEN);
+			 NLA_HDRLEN) +
+			(sizeof(stainfo->support_mode) + NLA_HDRLEN);
 
 	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
 	if (!skb) {
@@ -4575,7 +4576,7 @@ static int hdd_get_cached_station_remote(hdd_context_t *hdd_ctx,
 	stainfo->ch_width = hdd_decode_ch_width((tSirMacHTChannelWidth)
 						stainfo->ch_width);
 
-	if (nla_put_u32(skb, REMOTE_SUPPORTED_MODE, stainfo->dot11_mode) ||
+	if (nla_put_u32(skb, REMOTE_SUPPORTED_MODE, stainfo->support_mode) ||
 	    nla_put_u8(skb, REMOTE_CH_WIDTH, stainfo->ch_width)) {
 		hdd_err("remote ch put fail");
 		goto fail;
@@ -4612,7 +4613,10 @@ static int hdd_get_cached_station_remote(hdd_context_t *hdd_ctx,
 		goto fail;
 		}
 	}
-
+	if (nla_put_u32(skb, WLAN802_11_MODE, stainfo->dot11_mode)) {
+		hdd_err("dot11 mode put fail");
+		goto fail;
+	}
 	qdf_mem_zero(stainfo, sizeof(*stainfo));
 
 	return cfg80211_vendor_cmd_reply(skb);
@@ -16060,16 +16064,7 @@ static void wlan_hdd_fill_per_chain_rssi(struct cfg80211_inform_bss *data,
 }
 #endif
 
-/*
- * wlan_hdd_cfg80211_update_bss_list :to inform nl80211
- * interface that BSS might have been lost.
- * @pAdapter: adaptor
- * @bssid: bssid which might have been lost
- *
- * Return: bss which is unlinked from kernel cache
- */
-struct cfg80211_bss *wlan_hdd_cfg80211_update_bss_list(
-	hdd_adapter_t *pAdapter, tSirMacAddr bssid)
+void wlan_hdd_cfg80211_unlink_bss(hdd_adapter_t *pAdapter, tSirMacAddr bssid)
 {
 	struct net_device *dev = pAdapter->dev;
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
@@ -16078,14 +16073,15 @@ struct cfg80211_bss *wlan_hdd_cfg80211_update_bss_list(
 
 	bss = hdd_cfg80211_get_bss(wiphy, NULL, bssid,
 			NULL, 0);
-	if (bss == NULL) {
+	if (!bss) {
 		hdd_err("BSS not present");
 	} else {
 		hdd_debug("cfg80211_unlink_bss called for BSSID "
 			MAC_ADDRESS_STR, MAC_ADDR_ARRAY(bssid));
 		cfg80211_unlink_bss(wiphy, bss);
+		/* cfg80211_get_bss get bss with ref count so release it */
+		cfg80211_put_bss(wiphy, bss);
 	}
-	return bss;
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)) || \
