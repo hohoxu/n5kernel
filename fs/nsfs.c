@@ -8,6 +8,8 @@
 #include <linux/user_namespace.h>
 #include <linux/nsfs.h>
 
+#include "internal.h"
+
 static struct vfsmount *nsfs_mnt;
 
 static long ns_ioctl(struct file *filp, unsigned int ioctl,
