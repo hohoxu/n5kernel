@@ -1065,7 +1065,6 @@ static int bond_option_arp_validate_set(struct bonding *bond,
 {
 	netdev_info(bond->dev, "Setting arp_validate to %s (%llu)\n",
 		    newval->string, newval->value);
-
 	bond->params.arp_validate = newval->value;
 
 	return 0;
