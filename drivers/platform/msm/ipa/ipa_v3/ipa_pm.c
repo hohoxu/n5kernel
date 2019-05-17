@@ -744,8 +744,6 @@ int ipa_pm_register(struct ipa_pm_register_params *params, u32 *hdl)
 	wlock = &client->wlock;
 	wakeup_source_init(wlock, client->name);
 
-	init_completion(&client->complete);
-
 	/* add client to exception list */
 	if (add_client_to_exception_list(*hdl)) {
 		ipa_pm_deregister(*hdl);
@@ -940,7 +938,7 @@ static int ipa_pm_activate_helper(struct ipa_pm_client *client, bool sync)
 	}
 
 	client->state = IPA_PM_ACTIVATE_IN_PROGRESS;
-	reinit_completion(&client->complete);
+	init_completion(&client->complete);
 	queue_work(ipa_pm_ctx->wq, &client->activate_work);
 	spin_unlock_irqrestore(&client->state_lock, flags);
 	IPA_PM_DBG_STATE(client->hdl, client->name, client->state);
