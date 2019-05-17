@@ -1110,7 +1110,6 @@ static int ipa3_wwan_xmit(struct sk_buff *skb, struct net_device *dev)
 	int ret = 0;
 	bool qmap_check;
 	struct ipa3_wwan_private *wwan_ptr = netdev_priv(dev);
-	unsigned long flags;
 
 	if (skb->protocol != htons(ETH_P_MAP)) {
 		IPAWANDBG_LOW
@@ -1150,7 +1149,6 @@ static int ipa3_wwan_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 send:
-	spin_lock_irqsave(&wwan_ptr->lock, flags);
 	/* IPA_RM checking start */
 	if (ipa3_ctx->use_ipa_pm) {
 		/* activate the modem pm for clock scaling */
@@ -1162,7 +1160,6 @@ send:
 	}
 	if (ret == -EINPROGRESS) {
 		netif_stop_queue(dev);
-		spin_unlock_irqrestore(&wwan_ptr->lock, flags);
 		return NETDEV_TX_BUSY;
 	}
 	if (ret) {
@@ -1170,7 +1167,6 @@ send:
 		       dev->name, ret);
 		dev_kfree_skb_any(skb);
 		dev->stats.tx_dropped++;
-		spin_unlock_irqrestore(&wwan_ptr->lock, flags);
 		return -EFAULT;
 	}
 	/* IPA_RM checking end */
@@ -1199,7 +1195,6 @@ out:
 				IPA_RM_RESOURCE_WWAN_0_PROD);
 		}
 	}
-	spin_unlock_irqrestore(&wwan_ptr->lock, flags);
 	return ret;
 }
 
@@ -2578,7 +2573,6 @@ static int rmnet_ipa_ap_suspend(struct device *dev)
 	struct net_device *netdev = IPA_NETDEV();
 	struct ipa3_wwan_private *wwan_ptr;
 	int ret;
-	unsigned long flags;
 
 	IPAWANDBG("Enter...\n");
 
@@ -2588,19 +2582,20 @@ static int rmnet_ipa_ap_suspend(struct device *dev)
 		goto bail;
 	}
 
+	netif_tx_lock_bh(netdev);
 	wwan_ptr = netdev_priv(netdev);
 	if (wwan_ptr == NULL) {
 		IPAWANERR("wwan_ptr is NULL.\n");
 		ret = 0;
+		netif_tx_unlock_bh(netdev);
 		goto bail;
 	}
 
-	spin_lock_irqsave(&wwan_ptr->lock, flags);
-	/* Do not allow A7 to suspend in case there are outstanding packets */
+	/* Do not allow A7 to suspend in case there are oustanding packets */
 	if (atomic_read(&wwan_ptr->outstanding_pkts) != 0) {
 		IPAWANDBG("Outstanding packets, postponing AP suspend.\n");
 		ret = -EAGAIN;
-		spin_unlock_irqrestore(&wwan_ptr->lock, flags);
+		netif_tx_unlock_bh(netdev);
 		goto bail;
 	}
 
@@ -2609,8 +2604,7 @@ static int rmnet_ipa_ap_suspend(struct device *dev)
 	/* Stoppig Watch dog timer when pipe was in suspend state */
 	if (del_timer(&netdev->watchdog_timer))
 		dev_put(netdev);
-	spin_unlock_irqrestore(&wwan_ptr->lock, flags);
-
+	netif_tx_unlock_bh(netdev);
 	if (ipa3_ctx->use_ipa_pm)
 		ipa_pm_deactivate_sync(rmnet_ipa3_ctx->pm_hdl);
 	else
