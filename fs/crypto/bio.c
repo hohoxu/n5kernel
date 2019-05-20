@@ -37,7 +37,7 @@ static void __fscrypt_decrypt_bio(struct bio *bio, bool done)
 			SetPageUptodate(page);
 		} else {
 			int ret = fscrypt_decrypt_pagecache_blocks(page,
-					PAGE_SIZE, 0);
+					bv->bv_len, bv->bv_offset);
 			if (ret)
 				SetPageError(page);
 			else if (done)
