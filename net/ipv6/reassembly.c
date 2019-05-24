@@ -75,12 +75,10 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff *skb,
 static void ip6_frag_expire(unsigned long data)
 {
 	struct frag_queue *fq;
-	struct net *net;
 
 	fq = container_of((struct inet_frag_queue *)data, struct frag_queue, q);
-	net = container_of(fq->q.fqdir, struct net, ipv6.fqdir);
 
-	ip6frag_expire_frag_queue(net, fq);
+	ip6frag_expire_frag_queue(fq->q.fqdir->net, fq);
 }
 
 static struct frag_queue *
@@ -253,7 +251,7 @@ err:
 static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff *skb,
 			  struct sk_buff *prev_tail, struct net_device *dev)
 {
-	struct net *net = container_of(fq->q.fqdir, struct net, ipv6.fqdir);
+	struct net *net = fq->q.fqdir->net;
 	unsigned int nhoff;
 	void *reasm_data;
 	int payload_len;
@@ -515,7 +513,7 @@ static int __net_init ipv6_frags_init_net(struct net *net)
 	net->ipv6.fqdir.low_thresh = IPV6_FRAG_LOW_THRESH;
 	net->ipv6.fqdir.timeout = IPV6_FRAG_TIMEOUT;
 
-	res = fqdir_init(&net->ipv6.fqdir, &ip6_frags);
+	res = fqdir_init(&net->ipv6.fqdir, &ip6_frags, net);
 	if (res < 0)
 		return res;
 
