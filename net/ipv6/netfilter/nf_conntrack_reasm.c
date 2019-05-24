@@ -150,7 +150,7 @@ static void nf_ct_frag6_expire(unsigned long data)
 	struct net *net;
 
 	fq = container_of((struct inet_frag_queue *)data, struct frag_queue, q);
-	net = container_of(fq->q.net, struct net, nf_frag.frags);
+	net = container_of(fq->q.fqdir, struct net, nf_frag.frags);
 
 	ip6frag_expire_frag_queue(net, fq);
 }
@@ -275,7 +275,7 @@ static int nf_ct_frag6_queue(struct frag_queue *fq, struct sk_buff *skb,
 	fq->ecn |= ecn;
 	if (payload_len > fq->q.max_size)
 		fq->q.max_size = payload_len;
-	add_frag_mem_limit(fq->q.net, skb->truesize);
+	add_frag_mem_limit(fq->q.fqdir, skb->truesize);
 
 	/* The first fragment.
 	 * nhoffset is obtained from the first fragment, of course.

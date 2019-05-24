@@ -43,7 +43,7 @@ struct netns_ipv6 {
 	struct ipv6_devconf	*devconf_all;
 	struct ipv6_devconf	*devconf_dflt;
 	struct inet_peer_base	*peers;
-	struct netns_frags	frags;
+	struct fqdir	frags;
 #ifdef CONFIG_NETFILTER
 	struct xt_table		*ip6table_filter;
 	struct xt_table		*ip6table_mangle;
@@ -89,7 +89,7 @@ struct netns_ipv6 {
 
 #if IS_ENABLED(CONFIG_NF_DEFRAG_IPV6)
 struct netns_nf_frag {
-	struct netns_frags	frags;
+	struct fqdir	frags;
 };
 #endif
 
