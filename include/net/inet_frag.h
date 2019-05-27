@@ -2,6 +2,7 @@
 #define __NET_FRAG_H__
 
 #include <linux/rhashtable.h>
+#include <linux/completion.h>
 
 /* Per netns frag queues directory */
 struct fqdir {
@@ -103,6 +104,8 @@ struct inet_frags {
 	struct kmem_cache	*frags_cachep;
 	const char		*frags_cache_name;
 	struct rhashtable_params rhash_params;
+	atomic_t		refcnt;
+	struct completion	completion;
 };
 
 int inet_frags_init(struct inet_frags *);
