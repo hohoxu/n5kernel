@@ -1000,10 +1000,9 @@ static struct rt6_info *ip6_rt_pcpu_alloc(struct rt6_info *rt)
 /* It should be called with read_lock_bh(&tb6_lock) acquired */
 static struct rt6_info *rt6_get_pcpu_route(struct rt6_info *rt)
 {
-	struct rt6_info *pcpu_rt, **p;
+	struct rt6_info *pcpu_rt;
 
-	p = this_cpu_ptr(rt->rt6i_pcpu);
-	pcpu_rt = *p;
+	pcpu_rt = this_cpu_read(*rt->rt6i_pcpu);
 
 	if (pcpu_rt) {
 		dst_hold(&pcpu_rt->dst);
