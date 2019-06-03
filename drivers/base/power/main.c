@@ -1158,21 +1158,6 @@ int dpm_suspend_noirq(pm_message_t state)
 	return error;
 }
 
-static void dpm_propagate_wakeup_to_parent(struct device *dev)
-{
-	struct device *parent = dev->parent;
-
-	if (!parent)
-		return;
-
-	spin_lock_irq(&parent->power.lock);
-
-	if (dev->power.wakeup_path && !parent->power.ignore_children)
-		parent->power.wakeup_path = true;
-
-	spin_unlock_irq(&parent->power.lock);
-}
-
 /**
  * device_suspend_late - Execute a "late suspend" callback for given device.
  * @dev: Device to handle.
@@ -1227,11 +1212,8 @@ static int __device_suspend_late(struct device *dev, pm_message_t state, bool as
 	error = dpm_run_callback(callback, dev, state, info);
 	if (!error)
 		dev->power.is_late_suspended = true;
-	else {
+	else
 		async_error = error;
-		goto Complete;
-	}
-	dpm_propagate_wakeup_to_parent(dev);
 
 Complete:
 	TRACE_SUSPEND(error);
