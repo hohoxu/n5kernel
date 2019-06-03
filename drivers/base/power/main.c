@@ -1345,22 +1345,6 @@ static int legacy_suspend(struct device *dev, pm_message_t state,
 	return error;
 }
 
-static void dpm_propagate_to_parent(struct device *dev)
-{
-	struct device *parent = dev->parent;
-
-	if (!parent)
-		return;
-
-	spin_lock_irq(&parent->power.lock);
-
-	parent->power.direct_complete = false;
-	if (dev->power.wakeup_path && !parent->power.ignore_children)
-		parent->power.wakeup_path = true;
-
-	spin_unlock_irq(&parent->power.lock);
-}
-
 /**
  * device_suspend - Execute "suspend" callbacks for given device.
  * @dev: Device to handle.
@@ -1467,8 +1451,19 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 
  End:
 	if (!error) {
+		struct device *parent = dev->parent;
+
 		dev->power.is_suspended = true;
-		dpm_propagate_to_parent(dev);
+		if (parent) {
+			spin_lock_irq(&parent->power.lock);
+
+			dev->parent->power.direct_complete = false;
+			if (dev->power.wakeup_path
+			    && !dev->parent->power.ignore_children)
+				dev->parent->power.wakeup_path = true;
+
+			spin_unlock_irq(&parent->power.lock);
+		}
 	}
 
 	device_unlock(dev);
