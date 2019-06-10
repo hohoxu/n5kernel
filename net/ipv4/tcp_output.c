@@ -3023,7 +3023,7 @@ struct sk_buff *tcp_make_synack(const struct sock *sk, struct dst_entry *dst,
 	{
 		skb->skb_mstamp = tcp_clock_us();
 		if (!tcp_rsk(req)->snt_synack) /* Timestamp first SYNACK */
-			tcp_rsk(req)->snt_synack = tcp_skb_timestamp_us(skb);
+			tcp_rsk(req)->snt_synack = skb->skb_mstamp;
 	}
 
 #ifdef CONFIG_TCP_MD5SIG
