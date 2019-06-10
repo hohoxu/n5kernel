@@ -114,7 +114,6 @@ int sysctl_tcp_default_init_rwnd __read_mostly = TCP_INIT_CWND * 2;
 #define FLAG_ORIG_SACK_ACKED	0x200 /* Never retransmitted data are (s)acked	*/
 #define FLAG_SND_UNA_ADVANCED	0x400 /* Snd_una was changed (!= FLAG_DATA_ACKED) */
 #define FLAG_DSACKING_ACK	0x800 /* SACK blocks contained D-SACK info */
-#define FLAG_SET_XMIT_TIMER	0x1000 /* Set TLP or RTO timer */
 #define FLAG_SACK_RENEGING	0x2000 /* snd_una advanced to a sacked seq */
 #define FLAG_UPDATE_TS_RECENT	0x4000 /* tcp_replace_ts_recent() */
 #define FLAG_NO_CHALLENGE_ACK	0x8000 /* do not call tcp_send_challenge_ack()	*/
@@ -3040,13 +3039,6 @@ void tcp_resume_early_retransmit(struct sock *sk)
 	tcp_xmit_retransmit_queue(sk);
 }
 
-/* Try to schedule a loss probe; if that doesn't work, then schedule an RTO. */
-static void tcp_set_xmit_timer(struct sock *sk)
-{
-	if (!tcp_schedule_loss_probe(sk))
-		tcp_rearm_rto(sk);
-}
-
 /* If we get here, the whole TSO packet has not been acked. */
 static u32 tcp_tso_acked(struct sock *sk, struct sk_buff *skb)
 {
@@ -3206,7 +3198,7 @@ static int tcp_clean_rtx_queue(struct sock *sk, int prior_fackets,
 					ca_rtt_us);
 
 	if (flag & FLAG_ACKED) {
-		flag |= FLAG_SET_XMIT_TIMER;  /* set TLP or RTO timer */
+		tcp_rearm_rto(sk);
 		if (unlikely(icsk->icsk_mtup.probe_size &&
 			     !after(tp->mtu_probe.probe_seq_end, tp->snd_una))) {
 			tcp_mtup_probe_success(sk);
@@ -3243,7 +3235,7 @@ static int tcp_clean_rtx_queue(struct sock *sk, int prior_fackets,
 		 * after when the head was last (re)transmitted. Otherwise the
 		 * timeout may continue to extend in loss recovery.
 		 */
-		flag |= FLAG_SET_XMIT_TIMER;  /* set TLP or RTO timer */
+		tcp_rearm_rto(sk);
 	}
 
 	if (icsk->icsk_ca_ops->pkts_acked) {
@@ -3623,6 +3615,10 @@ static int tcp_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 
 	skb_mstamp_get(&now);
 
+	if (icsk->icsk_pending == ICSK_TIME_EARLY_RETRANS ||
+	    icsk->icsk_pending == ICSK_TIME_LOSS_PROBE)
+		tcp_rearm_rto(sk);
+
 	if (after(ack, prior_snd_una)) {
 		flag |= FLAG_SND_UNA_ADVANCED;
 		icsk->icsk_retransmits = 0;
@@ -3687,20 +3683,18 @@ static int tcp_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 	flag |= tcp_clean_rtx_queue(sk, prior_fackets, prior_snd_una, &acked,
 				    &sack_state, &now);
 
-	if (tp->tlp_high_seq)
-		tcp_process_tlp_ack(sk, ack, flag);
-	/* If needed, reset TLP/RTO timer; RACK may later override this. */
-	if (flag & FLAG_SET_XMIT_TIMER)
-		tcp_set_xmit_timer(sk);
-
 	if (tcp_ack_is_dubious(sk, flag)) {
 		is_dupack = !(flag & (FLAG_SND_UNA_ADVANCED | FLAG_NOT_DUP));
 		tcp_fastretrans_alert(sk, acked, is_dupack, &flag, &rexmit);
 	}
+	if (tp->tlp_high_seq)
+		tcp_process_tlp_ack(sk, ack, flag);
 
 	if ((flag & FLAG_FORWARD_PROGRESS) || !(flag & FLAG_NOT_DUP))
 		sk_dst_confirm(sk);
 
+	if (icsk->icsk_pending == ICSK_TIME_RETRANS)
+		tcp_schedule_loss_probe(sk);
 	delivered = tp->delivered - delivered;	/* freshly ACKed or SACKed */
 	lost = tp->lost - lost;			/* freshly marked lost */
 	tcp_rate_gen(sk, delivered, lost, is_sack_reneg, &now, &rs);
