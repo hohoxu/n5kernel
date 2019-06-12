@@ -723,6 +723,9 @@ static void uart_unthrottle(struct tty_struct *tty)
 	struct uart_port *port;
 	upstat_t mask = 0;
 
+	if (!state)
+		return;
+
 	port = uart_port_ref(state);
 	if (!port)
 		return;
@@ -1700,16 +1703,6 @@ static void uart_dtr_rts(struct tty_port *port, int onoff)
 		uart_clear_mctrl(uport, TIOCM_DTR | TIOCM_RTS);
 
 	uart_port_deref(uport);
-}
-
-static int uart_install(struct tty_driver *driver, struct tty_struct *tty)
-{
-	struct uart_driver *drv = driver->driver_state;
-	struct uart_state *state = drv->state + tty->index;
-
-	tty->driver_data = state;
-
-	return tty_standard_install(driver, tty);
 }
 
 /*
