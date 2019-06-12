@@ -144,7 +144,6 @@ typedef int (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 /* Has write method(s) */
 #define FMODE_CAN_WRITE         ((__force fmode_t)0x40000)
 
-
 /* File is stream-like */
 #define FMODE_STREAM		((__force fmode_t)0x200000)
 
