@@ -504,6 +504,11 @@ static int nf_ct_net_init(struct net *net)
 	return res;
 }
 
+static void nf_ct_net_pre_exit(struct net *net)
+{
+	fqdir_pre_exit(net->nf_frag.fqdir);
+}
+
 static void nf_ct_net_exit(struct net *net)
 {
 	nf_ct_frags6_sysctl_unregister(net);
@@ -511,8 +516,9 @@ static void nf_ct_net_exit(struct net *net)
 }
 
 static struct pernet_operations nf_ct_net_ops = {
-	.init = nf_ct_net_init,
-	.exit = nf_ct_net_exit,
+	.init		= nf_ct_net_init,
+	.pre_exit	= nf_ct_net_pre_exit,
+	.exit		= nf_ct_net_exit,
 };
 
 static const struct rhashtable_params nfct_rhash_params = {
