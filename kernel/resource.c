@@ -389,15 +389,16 @@ static int find_next_iomem_res(struct resource *res, unsigned long desc,
 			break;
 	}
 
+	if (p) {
+		/* copy data */
+		if (res->start < p->start)
+			res->start = p->start;
+		if (res->end > p->end)
+			res->end = p->end;
+	}
+
 	read_unlock(&resource_lock);
-	if (!p)
-		return -1;
-	/* copy data */
-	if (res->start < p->start)
-		res->start = p->start;
-	if (res->end > p->end)
-		res->end = p->end;
-	return 0;
+	return p ? 0 : -ENODEV;
 }
 
 /*
