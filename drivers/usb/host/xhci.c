@@ -1467,6 +1467,10 @@ int xhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 		ret = -ESHUTDOWN;
 		goto exit;
 	}
+	if (xhci->devs[slot_id]->flags & VDEV_PORT_ERROR) {
+		xhci_dbg(xhci, "Can't queue urb, port error, link inactive\n");
+		return -ENODEV;
+	}
 
 	if (usb_endpoint_xfer_isoc(&urb->ep->desc))
 		size = urb->number_of_packets;
@@ -3702,6 +3706,7 @@ int xhci_discover_or_reset_device(struct usb_hcd *hcd, struct usb_device *udev)
 	}
 	/* If necessary, update the number of active TTs on this root port */
 	xhci_update_tt_active_eps(xhci, virt_dev, old_active_eps);
+	virt_dev->flags = 0;
 
 	xhci_dbg(xhci, "Output context after successful reset device cmd:\n");
 	xhci_dbg_ctx(xhci, virt_dev->out_ctx, last_freed_endpoint);
