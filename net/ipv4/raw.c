@@ -196,8 +196,7 @@ static int raw_v4_input(struct sk_buff *skb, const struct iphdr *iph, int hash)
 				raw_rcv(sk, clone);
 		}
 		sk = __raw_v4_lookup(net, sk_next(sk), iph->protocol,
-				     iph->saddr, iph->daddr,
-				     skb->dev->ifindex);
+				     iph->saddr, iph->daddr, dif);
 	}
 out:
 	read_unlock(&raw_v4_hashinfo.lock);
