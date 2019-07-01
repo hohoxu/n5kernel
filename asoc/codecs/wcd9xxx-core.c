@@ -1233,6 +1233,7 @@ static int wcd9xxx_slim_probe(struct slim_device *slim)
 	const struct slim_device_id *device_id;
 	int ret = 0;
 	int intf_type;
+
 	intf_type = wcd9xxx_get_intf_type();
 
 	wcd9xxx = devm_kzalloc(&slim->dev, sizeof(struct wcd9xxx),
@@ -1433,7 +1434,6 @@ static int wcd9xxx_slim_probe(struct slim_device *slim)
 		(void *) "slimslave_reg_dump", &codec_debug_ops);
 	}
 #endif
-
 	return ret;
 
 err_slim_add:
