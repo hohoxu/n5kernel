@@ -2680,7 +2680,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
  */
 static bool inactive_list_is_low(struct lruvec *lruvec, bool file,
 				 struct mem_cgroup *memcg,
-				 struct scan_control *sc, bool trace)
+				 struct scan_control *sc, bool actual_reclaim)
 {
 	enum lru_list active_lru = file * LRU_FILE + LRU_ACTIVE;
 	enum lru_list inactive_lru = file * LRU_FILE;
@@ -2715,7 +2715,7 @@ static bool inactive_list_is_low(struct lruvec *lruvec, bool file,
 	 * is being established. Disable active list protection to get
 	 * rid of the stale workingset quickly.
 	 */
-	if (file && lruvec->refaults != refaults) {
+	if (file && actual_reclaim && lruvec->refaults != refaults) {
 		inactive_ratio = 0;
 	} else {
 		gb = (inactive + active) >> (30 - PAGE_SHIFT);
