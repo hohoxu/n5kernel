@@ -633,7 +633,6 @@ static int zram_compress(struct zram *zram, struct zcomp_strm **zstrm,
 	unsigned long alloced_pages;
 	unsigned long handle = 0;
 	struct zram_meta *meta = zram->meta;
-	static unsigned long zram_rs_time;
 
 compress_again:
 	src = kmap_atomic(page);
