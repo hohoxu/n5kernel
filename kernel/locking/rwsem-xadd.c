@@ -274,8 +274,10 @@ struct rw_semaphore __sched *rwsem_down_read_failed(struct rw_semaphore *sem)
 	/* wait to be given the lock */
 	while (true) {
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		if (!waiter.task)
+		if (!smp_load_acquire(&waiter.task)) {
+			/* Orders against rwsem_mark_wake()'s smp_store_release() */
 			break;
+		}
 		schedule();
 	}
 
