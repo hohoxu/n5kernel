@@ -1030,13 +1030,6 @@ static struct ctl_table ipv4_net_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_douintvec,
 	},
-	{
-		.procname	= "tcp_comp_sack_delay_ns",
-		.data		= &init_net.ipv4.sysctl_tcp_comp_sack_delay_ns,
-		.maxlen		= sizeof(unsigned long),
-		.mode		= 0644,
-		.proc_handler	= proc_doulongvec_minmax,
-	},
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 	{
 		.procname	= "fib_multipath_use_neigh",
