@@ -5081,8 +5081,7 @@ send_now:
 		return;
 	}
 
-	if (!tcp_is_sack(tp) ||
-	    tp->compressed_ack >= sock_net(sk)->ipv4.sysctl_tcp_comp_sack_nr)
+	if (!tcp_is_sack(tp) || tp->compressed_ack >= 44)
 		goto send_now;
 	tp->compressed_ack++;
 
