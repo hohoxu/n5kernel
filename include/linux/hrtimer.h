@@ -473,7 +473,7 @@ extern int schedule_hrtimeout_range(ktime_t *expires, u64 delta,
 extern int schedule_hrtimeout_range_clock(ktime_t *expires,
 					  u64 delta,
 					  const enum hrtimer_mode mode,
-					  clockid_t clock_id);
+					  int clock);
 extern int schedule_hrtimeout(ktime_t *expires, const enum hrtimer_mode mode);
 
 /* Soft interrupt function to run the hrtimer queues: */
