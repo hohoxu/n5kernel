@@ -932,12 +932,12 @@ static inline ktime_t hrtimer_update_lowres(struct hrtimer *timer, ktime_t tim,
 }
 
 /**
- * hrtimer_start_range_ns - (re)start an hrtimer
+ * hrtimer_start_range_ns - (re)start an hrtimer on the current CPU
  * @timer:	the timer to be added
  * @tim:	expiry time
  * @delta_ns:	"slack" range for the timer
- * @mode:	timer mode: absolute (HRTIMER_MODE_ABS) or
- *		relative (HRTIMER_MODE_REL), and pinned (HRTIMER_MODE_PINNED)
+ * @mode:	expiry mode: absolute (HRTIMER_MODE_ABS) or
+ *		relative (HRTIMER_MODE_REL)
  */
 void hrtimer_start_range_ns(struct hrtimer *timer, ktime_t tim,
 			    u64 delta_ns, const enum hrtimer_mode mode)
@@ -1124,8 +1124,7 @@ static void __hrtimer_init(struct hrtimer *timer, clockid_t clock_id,
  * hrtimer_init - initialize a timer to the given clock
  * @timer:	the timer to be initialized
  * @clock_id:	the clock to be used
- * @mode:	timer mode: absolute (HRTIMER_MODE_ABS) or
- *		relative (HRTIMER_MODE_REL); pinned is not considered here!
+ * @mode:	timer mode abs/rel
  */
 void hrtimer_init(struct hrtimer *timer, clockid_t clock_id,
 		  enum hrtimer_mode mode)

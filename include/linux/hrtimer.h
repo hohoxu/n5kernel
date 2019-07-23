@@ -372,11 +372,11 @@ extern void hrtimer_start_range_ns(struct hrtimer *timer, ktime_t tim,
 				   u64 range_ns, const enum hrtimer_mode mode);
 
 /**
- * hrtimer_start - (re)start an hrtimer
+ * hrtimer_start - (re)start an hrtimer on the current CPU
  * @timer:	the timer to be added
  * @tim:	expiry time
- * @mode:	timer mode: absolute (HRTIMER_MODE_ABS) or
- *		relative (HRTIMER_MODE_REL), and pinned (HRTIMER_MODE_PINNED)
+ * @mode:	expiry mode: absolute (HRTIMER_MODE_ABS) or
+ *		relative (HRTIMER_MODE_REL)
  */
 static inline void hrtimer_start(struct hrtimer *timer, ktime_t tim,
 				 const enum hrtimer_mode mode)
