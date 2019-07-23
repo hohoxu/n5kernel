@@ -179,12 +179,6 @@ static inline void tcp_event_ack_sent(struct sock *sk, unsigned int pkts,
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 
-	if (unlikely(tp->compressed_ack)) {
-		tp->compressed_ack = 0;
-		if (hrtimer_try_to_cancel(&tp->compressed_ack_timer) == 1)
-			__sock_put(sk);
-	}
-
 	if (unlikely(rcv_nxt != tp->rcv_nxt))
 		return;  /* Special ACK sent by DCTCP to reflect ECN */
 	tcp_dec_quickack_mode(sk, pkts);

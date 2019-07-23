@@ -224,7 +224,6 @@ struct tcp_sock {
 		   reord:1;	 /* reordering detected */
 	} rack;
 	u16	advmss;		/* Advertised MSS			*/
-	u8	compressed_ack;
 	u8	rate_app_limited:1,  /* rate_{delivered,interval_us} limited? */
 		fastopen_connect:1, /* FASTOPEN_CONNECT sockopt */
 		is_sack_reneg:1,    /* in recovery from loss with SACK reneg? */
@@ -295,8 +294,6 @@ struct tcp_sock {
 	u32	pushed_seq;	/* Last pushed seq, required to talk to windows */
 	u32	lost_out;	/* Lost packets			*/
 	u32	sacked_out;	/* SACK'd packets			*/
-
-	struct hrtimer	compressed_ack_timer;
 
 	/* from STCP, retrans queue hinting */
 	struct sk_buff* lost_skb_hint;
