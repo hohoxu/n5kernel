@@ -456,13 +456,21 @@ __next_base(struct hrtimer_cpu_base *cpu_base, unsigned int *active)
 	while ((base = __next_base((cpu_base), &(active))))
 
 #if defined(CONFIG_NO_HZ_COMMON) || defined(CONFIG_HIGH_RES_TIMERS)
+static inline void hrtimer_update_next_timer(struct hrtimer_cpu_base *cpu_base,
+					     struct hrtimer *timer)
+{
+#ifdef CONFIG_HIGH_RES_TIMERS
+	cpu_base->next_timer = timer;
+#endif
+}
+
 static ktime_t __hrtimer_get_next_event(struct hrtimer_cpu_base *cpu_base)
 {
 	struct hrtimer_clock_base *base;
 	ktime_t expires, expires_next = { .tv64 = KTIME_MAX };
 	unsigned int active = cpu_base->active_bases;
 
-	cpu_base->next_timer = NULL;
+	hrtimer_update_next_timer(cpu_base, NULL);
 	for_each_active_base(base, cpu_base, active) {
 		struct timerqueue_node *next;
 		struct hrtimer *timer;
@@ -472,7 +480,7 @@ static ktime_t __hrtimer_get_next_event(struct hrtimer_cpu_base *cpu_base)
 		expires = ktime_sub(hrtimer_get_expires(timer), base->offset);
 		if (expires.tv64 < expires_next.tv64) {
 			expires_next = expires;
-			cpu_base->next_timer = timer;
+			hrtimer_update_next_timer(cpu_base, timer);
 		}
 	}
 	/*
