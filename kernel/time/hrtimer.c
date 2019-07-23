@@ -645,10 +645,10 @@ static inline void retrigger_next_event(void *arg) { }
  *
  * Called with interrupts disabled and base->cpu_base.lock held
  */
-static void hrtimer_reprogram(struct hrtimer *timer)
+static void hrtimer_reprogram(struct hrtimer *timer,
+			      struct hrtimer_clock_base *base)
 {
 	struct hrtimer_cpu_base *cpu_base = this_cpu_ptr(&hrtimer_bases);
-	struct hrtimer_clock_base *base = timer->base;
 	ktime_t expires = ktime_sub(hrtimer_get_expires(timer), base->offset);
 
 	WARN_ON_ONCE(hrtimer_get_expires_tv64(timer) < 0);
@@ -947,7 +947,7 @@ void hrtimer_start_range_ns(struct hrtimer *timer, ktime_t tim,
 	if (!leftmost)
 		goto unlock;
 
-	hrtimer_reprogram(timer);
+	hrtimer_reprogram(timer, new_base);
 unlock:
 	unlock_hrtimer_base(timer, &flags);
 }
