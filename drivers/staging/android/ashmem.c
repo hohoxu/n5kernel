@@ -175,15 +175,19 @@ static inline void lru_del(struct ashmem_range *range)
  * @end:	   The ending page (inclusive)
  *
  * This function is protected by ashmem_mutex.
+ *
+ * Return: 0 if successful, or -ENOMEM if there is an error
  */
-static void range_alloc(struct ashmem_area *asma,
-			struct ashmem_range *prev_range, unsigned int purged,
-			size_t start, size_t end,
-			struct ashmem_range **new_range)
+static int range_alloc(struct ashmem_area *asma,
+		       struct ashmem_range *prev_range, unsigned int purged,
+		       size_t start, size_t end)
 {
-	struct ashmem_range *range = *new_range;
+	struct ashmem_range *range;
 
-	*new_range = NULL;
+	range = kmem_cache_zalloc(ashmem_range_cachep, GFP_KERNEL);
+	if (!range)
+		return -ENOMEM;
+
 	range->asma = asma;
 	range->pgstart = start;
 	range->pgend = end;
@@ -193,6 +197,8 @@ static void range_alloc(struct ashmem_area *asma,
 
 	if (range_on_lru(range))
 		lru_add(range);
+
+	return 0;
 }
 
 /**
@@ -597,8 +603,7 @@ static int get_name(struct ashmem_area *asma, void __user *name)
  *
  * Caller must hold ashmem_mutex.
  */
-static int ashmem_pin(struct ashmem_area *asma, size_t pgstart, size_t pgend,
-		      struct ashmem_range **new_range)
+static int ashmem_pin(struct ashmem_area *asma, size_t pgstart, size_t pgend)
 {
 	struct ashmem_range *range, *next;
 	int ret = ASHMEM_NOT_PURGED;
@@ -651,7 +656,7 @@ static int ashmem_pin(struct ashmem_area *asma, size_t pgstart, size_t pgend,
 			 * second half and adjust the first chunk's endpoint.
 			 */
 			range_alloc(asma, range, range->purged,
-				    pgend + 1, range->pgend, new_range);
+				    pgend + 1, range->pgend);
 			range_shrink(range, range->pgstart, pgstart - 1);
 			break;
 		}
@@ -665,8 +670,7 @@ static int ashmem_pin(struct ashmem_area *asma, size_t pgstart, size_t pgend,
  *
  * Caller must hold ashmem_mutex.
  */
-static int ashmem_unpin(struct ashmem_area *asma, size_t pgstart, size_t pgend,
-			struct ashmem_range **new_range)
+static int ashmem_unpin(struct ashmem_area *asma, size_t pgstart, size_t pgend)
 {
 	struct ashmem_range *range, *next;
 	unsigned int purged = ASHMEM_NOT_PURGED;
@@ -692,8 +696,7 @@ restart:
 		}
 	}
 
-	range_alloc(asma, range, purged, pgstart, pgend, new_range);
-	return 0;
+	return range_alloc(asma, range, purged, pgstart, pgend);
 }
 
 /*
@@ -726,16 +729,9 @@ static int ashmem_pin_unpin(struct ashmem_area *asma, unsigned long cmd,
 	struct ashmem_pin pin;
 	size_t pgstart, pgend;
 	int ret = -EINVAL;
-	struct ashmem_range *range = NULL;
 
 	if (copy_from_user(&pin, p, sizeof(pin)))
 		return -EFAULT;
-
-	if (cmd == ASHMEM_PIN || cmd == ASHMEM_UNPIN) {
-		range = kmem_cache_zalloc(ashmem_range_cachep, GFP_KERNEL);
-		if (!range)
-			return -ENOMEM;
-	}
 
 	mutex_lock(&ashmem_mutex);
 	wait_event(ashmem_shrink_wait, !atomic_read(&ashmem_shrink_inflight));
@@ -761,10 +757,10 @@ static int ashmem_pin_unpin(struct ashmem_area *asma, unsigned long cmd,
 
 	switch (cmd) {
 	case ASHMEM_PIN:
-		ret = ashmem_pin(asma, pgstart, pgend, &range);
+		ret = ashmem_pin(asma, pgstart, pgend);
 		break;
 	case ASHMEM_UNPIN:
-		ret = ashmem_unpin(asma, pgstart, pgend, &range);
+		ret = ashmem_unpin(asma, pgstart, pgend);
 		break;
 	case ASHMEM_GET_PIN_STATUS:
 		ret = ashmem_get_pin_status(asma, pgstart, pgend);
@@ -773,8 +769,6 @@ static int ashmem_pin_unpin(struct ashmem_area *asma, unsigned long cmd,
 
 out_unlock:
 	mutex_unlock(&ashmem_mutex);
-	if (range)
-		kmem_cache_free(ashmem_range_cachep, range);
 
 	return ret;
 }
