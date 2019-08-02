@@ -1063,8 +1063,12 @@ struct sony_sc {
 
 static inline void sony_schedule_work(struct sony_sc *sc)
 {
-	if (!sc->defer_initialization)
+	unsigned long flags;
+
+	spin_lock_irqsave(&sc->lock, flags);
+	if (!sc->defer_initialization && sc->worker_initialized)
 		schedule_work(&sc->state_worker);
+	spin_unlock_irqrestore(&sc->lock, flags);
 }
 
 static u8 *sixaxis_fixup(struct hid_device *hdev, u8 *rdesc,
@@ -2325,8 +2329,14 @@ static inline void sony_init_output_report(struct sony_sc *sc,
 
 static inline void sony_cancel_work_sync(struct sony_sc *sc)
 {
-	if (sc->worker_initialized)
+	unsigned long flags;
+
+	if (sc->worker_initialized) {
+		spin_lock_irqsave(&sc->lock, flags);
+		sc->worker_initialized = 0;
+		spin_unlock_irqrestore(&sc->lock, flags);
 		cancel_work_sync(&sc->state_worker);
+	}
 }
 
 static int sony_probe(struct hid_device *hdev, const struct hid_device_id *id)
