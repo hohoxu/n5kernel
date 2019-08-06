@@ -285,7 +285,6 @@ int ipa3_send(struct ipa3_sys_context *sys,
 	u32 mem_flag = GFP_ATOMIC;
 	const struct ipa_gsi_ep_config *gsi_ep_cfg;
 	bool send_nop = false;
-	unsigned long flags;
 
 	if (unlikely(!in_atomic))
 		mem_flag = GFP_KERNEL;
@@ -311,7 +310,7 @@ int ipa3_send(struct ipa3_sys_context *sys,
 		return -ENOMEM;
 	}
 
-	spin_lock_irqsave(&sys->spinlock, flags);
+	spin_lock_bh(&sys->spinlock);
 
 	for (i = 0; i < num_desc; i++) {
 		tx_pkt = kmem_cache_zalloc(ipa3_ctx->tx_pkt_wrapper_cache,
@@ -431,7 +430,7 @@ int ipa3_send(struct ipa3_sys_context *sys,
 		sys->nop_pending = true;
 		send_nop = true;
 	}
-	spin_unlock_irqrestore(&sys->spinlock, flags);
+	spin_unlock_bh(&sys->spinlock);
 
 	/* set the timer for sending the NOP descriptor */
 	if (send_nop) {
@@ -475,7 +474,7 @@ failure:
 
 	kfree(gsi_xfer_elem_array);
 
-	spin_unlock_irqrestore(&sys->spinlock, flags);
+	spin_unlock_bh(&sys->spinlock);
 	return result;
 }
 
