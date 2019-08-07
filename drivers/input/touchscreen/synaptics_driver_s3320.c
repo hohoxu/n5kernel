@@ -6199,6 +6199,7 @@ static int synaptics_ts_suspend(struct device *dev)
 			TPD_ERR("enter gesture mode\n");
 		}
 		//set_doze_time(2);	/*change dozeinterval by firmware*/
+		//just for fajita
 		if (ts->project_version == 0x03) {
 			mutex_lock(&ts->mutex);
 			tp_single_tap_en(ts, true);
