@@ -810,6 +810,7 @@ static int userfaultfd_register(struct userfaultfd_ctx *ctx,
 	down_write(&mm->mmap_sem);
 	if (!mmget_still_valid(mm))
 		goto out_unlock;
+
 	vma = find_vma_prev(mm, start, &prev);
 	if (!vma)
 		goto out_unlock;
@@ -960,6 +961,7 @@ static int userfaultfd_unregister(struct userfaultfd_ctx *ctx,
 	down_write(&mm->mmap_sem);
 	if (!mmget_still_valid(mm))
 		goto out_unlock;
+
 	vma = find_vma_prev(mm, start, &prev);
 	if (!vma)
 		goto out_unlock;
