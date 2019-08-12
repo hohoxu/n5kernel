@@ -4,5 +4,3 @@ obj-$(CONFIG_CRPL) += crpl/
 obj-$(CONFIG_DEFRAG_HELPER) += defrag/
 obj-$(CONFIG_OPCHAIN) += opchain/
 obj-$(CONFIG_HOUSTON) += houston/
-obj-$(CONFIG_MEMPLUS) += memplus/
-obj-$(CONFIG_FSC) += fsc/

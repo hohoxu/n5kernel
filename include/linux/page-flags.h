@@ -106,9 +106,6 @@ enum pageflags {
 	PG_idle,
 #endif
 	PG_uidlru,
-#ifdef CONFIG_MEMPLUS
-	PG_willneed,
-#endif
 	__NR_PAGEFLAGS,
 
 	/* Filesystems */
@@ -265,9 +262,6 @@ PAGEFLAG(Dirty, dirty, PF_HEAD) TESTSCFLAG(Dirty, dirty, PF_HEAD)
 	__CLEARPAGEFLAG(Dirty, dirty, PF_HEAD)
 PAGEFLAG(LRU, lru, PF_HEAD) __CLEARPAGEFLAG(LRU, lru, PF_HEAD)
 PAGEFLAG(UIDLRU, uidlru, PF_HEAD) __CLEARPAGEFLAG(UIDLRU, uidlru, PF_HEAD)
-#ifdef CONFIG_MEMPLUS
-PAGEFLAG(Willneed, willneed, PF_HEAD) __CLEARPAGEFLAG(Willneed, willneed, PF_HEAD)
-#endif
 PAGEFLAG(Active, active, PF_HEAD) __CLEARPAGEFLAG(Active, active, PF_HEAD)
 	TESTCLEARFLAG(Active, active, PF_HEAD)
 __PAGEFLAG(Slab, slab, PF_NO_TAIL)

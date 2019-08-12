@@ -80,12 +80,6 @@
 #endif
 #define IF_HAVE_PG_UIDRU(flag,string) ,{1UL << flag, string}
 
-#ifdef CONFIG_MEMPLUS
-#define IF_HAVE_PG_WILLNEED(flag,string) ,{1UL << flag, string}
-#else
-#define IF_HAVE_PG_WILLNEED(flag,string)
-#endif
-
 #define __def_pageflag_names						\
 	{1UL << PG_locked,		"locked"	},		\
 	{1UL << PG_error,		"error"		},		\
@@ -112,9 +106,7 @@ IF_HAVE_PG_UNCACHED(PG_uncached,	"uncached"	)		\
 IF_HAVE_PG_HWPOISON(PG_hwpoison,	"hwpoison"	)		\
 IF_HAVE_PG_IDLE(PG_young,		"young"		)		\
 IF_HAVE_PG_IDLE(PG_idle,		"idle"		)			\
-IF_HAVE_PG_UIDRU(PG_uidlru,	"uidlru")	\
-IF_HAVE_PG_WILLNEED(PG_willneed, "willneed")
-
+IF_HAVE_PG_UIDRU(PG_uidlru,	"uidlru")
 
 
 #define show_page_flags(flags)						\
