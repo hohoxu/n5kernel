@@ -432,6 +432,14 @@ static int linehandle_create(struct gpio_device *gdev, void __user *ip)
 	if ((handlereq.lines == 0) || (handlereq.lines > GPIOHANDLES_MAX))
 		return -EINVAL;
 
+	/*
+	 * Do not allow both INPUT & OUTPUT flags to be set as they are
+	 * contradictory.
+	 */
+	if ((handlereq.flags & GPIOHANDLE_REQUEST_INPUT) &&
+	    (handlereq.flags & GPIOHANDLE_REQUEST_OUTPUT))
+		return -EINVAL;
+
 	lh = kzalloc(sizeof(*lh), GFP_KERNEL);
 	if (!lh)
 		return -ENOMEM;
