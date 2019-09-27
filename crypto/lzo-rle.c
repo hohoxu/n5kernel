@@ -28,6 +28,16 @@ struct lzorle_ctx {
 	void *lzorle_comp_mem;
 };
 
+static inline void *kvmalloc(size_t size, gfp_t flags)
+{
+	void *ret;
+
+	ret = kmalloc(size, flags | __GFP_NOWARN);
+	if (!ret)
+		ret = __vmalloc(size, flags, PAGE_KERNEL);
+	return ret;
+}
+
 static void *lzorle_alloc_ctx(struct crypto_scomp *tfm)
 {
 	void *ctx;
