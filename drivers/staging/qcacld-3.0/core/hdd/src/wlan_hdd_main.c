@@ -9334,8 +9334,6 @@ wlan_hdd_add_monitor_check(hdd_context_t *hdd_ctx, hdd_adapter_t **adapter,
 	hdd_adapter_t *mon_adapter;
 	uint32_t mode;
 
-	*adapter = NULL;
-
 	if (!cds_get_pktcap_mode_enable())
 		return 0;
 
@@ -9380,8 +9378,12 @@ wlan_hdd_add_monitor_check(hdd_context_t *hdd_ctx, hdd_adapter_t **adapter,
 			continue;
 
 		adapter = hdd_get_adapter(hdd_ctx, mode);
-		if (adapter)
+		if (adapter) {
+			wlan_hdd_release_intf_addr(
+					hdd_ctx,
+					adapter->macAddressCurrent.bytes);
 			hdd_close_adapter(hdd_ctx, adapter, rtnl_held);
+		}
 	}
 
 	mon_adapter = hdd_open_adapter(hdd_ctx, QDF_MONITOR_MODE, name,
